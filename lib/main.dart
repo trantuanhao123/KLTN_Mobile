@@ -1,10 +1,11 @@
-// lib/main.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile/providers/auth_provider.dart';
+import 'package:mobile/providers/user_provider.dart';
+import 'package:mobile/providers/car_provider.dart';
+import 'package:mobile/providers/home_provider.dart'; // <-- THÊM DÒNG NÀY
 import 'package:mobile/screens/login_screen.dart';
-import 'package:mobile/screens/main_screen.dart'; // Import MainScreen mới
+import 'package:mobile/screens/main_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -15,21 +16,36 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => AuthProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => AuthProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, UserProvider>(
+          create: (context) => UserProvider(),
+          update: (context, auth, previous) => previous!..fetchUserProfileIfAuthenticated(auth.isAuthenticated),
+        ),
+        ChangeNotifierProvider(create: (context) => CarProvider()),
+        ChangeNotifierProvider(create: (context) => HomeProvider()),
+      ],
       child: MaterialApp(
         title: 'Car Rental App',
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1CE88A), brightness: Brightness.dark),
           useMaterial3: true,
         ),
         home: Consumer<AuthProvider>(
-          builder: (context, authProvider, child) {
-            // SỬA Ở ĐÂY: Chuyển đến MainScreen thay vì HomeScreen
-            return authProvider.isAuthenticated ? const MainScreen() : const LoginScreen();
+          builder: (context, auth, child) {
+            return auth.isAuthenticated ? const MainScreen() : const LoginScreen();
           },
         ),
       ),
     );
+  }
+}
+
+extension UserProviderExtension on UserProvider {
+  void fetchUserProfileIfAuthenticated(bool isAuthenticated) {
+    if (isAuthenticated) {
+      fetchUserProfile();
+    }
   }
 }

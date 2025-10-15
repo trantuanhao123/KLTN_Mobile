@@ -1,24 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/screens/home_screen.dart';
+import 'package:mobile/screens/profile_screen.dart';
+import 'package:mobile/screens/car_list_screen.dart';
 
-class BrandsScreen extends StatelessWidget {
-  const BrandsScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const Scaffold(backgroundColor: Colors.black, body: Center(child: Text('Trang Thương Hiệu', style: TextStyle(color: Colors.white))));
-}
-
+// Widget giữ chỗ
 class MyBookingScreen extends StatelessWidget {
   const MyBookingScreen({super.key});
   @override
   Widget build(BuildContext context) => const Scaffold(backgroundColor: Colors.black, body: Center(child: Text('Trang Lịch Đặt Của Tôi', style: TextStyle(color: Colors.white))));
 }
-
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const Scaffold(backgroundColor: Colors.black, body: Center(child: Text('Trang Hồ Sơ', style: TextStyle(color: Colors.white))));
-}
-
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -30,10 +20,9 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  // Danh sách các màn hình tương ứng với các tab
   static const List<Widget> _widgetOptions = <Widget>[
     HomeScreen(),
-    BrandsScreen(),
+    CarListScreen(),
     MyBookingScreen(),
     ProfileScreen(),
   ];
@@ -58,9 +47,9 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Trang chủ',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.explore_outlined),
-            activeIcon: Icon(Icons.explore),
-            label: 'Thương hiệu',
+            icon: Icon(Icons.directions_car_outlined), // Đổi icon cho phù hợp
+            activeIcon: Icon(Icons.directions_car),
+            label: 'Thuê xe', // Đổi tên cho phù hợp
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.calendar_today_outlined),
@@ -75,8 +64,6 @@ class _MainScreenState extends State<MainScreen> {
         ],
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-
-        // Cấu hình màu sắc cho theme tối
         backgroundColor: Colors.black,
         type: BottomNavigationBarType.fixed,
         selectedItemColor: const Color(0xFF1CE88A),
