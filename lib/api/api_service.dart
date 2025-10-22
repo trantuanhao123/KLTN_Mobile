@@ -6,7 +6,7 @@ import 'package:http_parser/http_parser.dart';
 
 class ApiService {
   // URL cho API
-  static const String _baseUrl = "http://192.168.1.10:8080";
+  static const String _baseUrl = "http://192.168.1.5:8080";
   static const int _timeoutSeconds = 30; // Thời gian chờ tối đa cho yêu cầu HTTP
 
   // Getter để truy cập an toàn vào baseUrl
@@ -309,6 +309,37 @@ class ApiService {
       if (response.statusCode != 200) {
         final errorData = jsonDecode(response.body);
         throw Exception(errorData['message'] ?? 'Xác thực thất bại');
+      }
+    } catch (e) {
+      throw Exception('Lỗi kết nối: ${e.toString()}');
+    }
+  }
+
+  /// Tạo liên kết thanh toán qua PayOS
+  Future<String> createPaymentLink({
+    required double amount,
+    required String description,
+  }) async {
+    if (amount <= 0) throw Exception('Số tiền không hợp lệ');
+
+    try {
+      final response = await http
+          .post(
+        Uri.parse('$baseUrl/payos/create-payment'),
+        headers: await _getHeaders(),
+        body: jsonEncode({
+          'amount': amount.toInt(), // PayOS yêu cầu số nguyên
+          'description': description,
+        }),
+      )
+          .timeout(Duration(seconds: _timeoutSeconds));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['url'];
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Tạo liên kết thanh toán thất bại');
       }
     } catch (e) {
       throw Exception('Lỗi kết nối: ${e.toString()}');

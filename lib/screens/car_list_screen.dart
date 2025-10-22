@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile/providers/car_provider.dart';
 import 'package:mobile/api/api_service.dart';
+import 'package:mobile/screens/car_detail_screen.dart';
 
 class CarListScreen extends StatefulWidget {
   const CarListScreen({super.key});
@@ -231,44 +232,54 @@ class _CarListScreenState extends State<CarListScreen> {
                       final imageUrl = car['mainImageUrl'];
                       final fullCarImageUrl = imageUrl != null ? "$baseUrl/images/$imageUrl" : null;
 
-                      return Card(
-                        color: Colors.grey[900],
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
-                        clipBehavior: Clip.antiAlias,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: (fullCarImageUrl != null)
-                                  ? Image.network(
-                                fullCarImageUrl,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                const Center(child: Icon(Icons.image_not_supported, color: Colors.grey, size: 40)),
-                              )
-                                  : const Center(child: Icon(Icons.directions_car, color: Colors.grey, size: 40)),
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CarDetailScreen(car: car),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.all(10.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    "${car['BRAND'] ?? ''} ${car['MODEL'] ?? ''}",
-                                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    priceFormat.format(double.tryParse(car['PRICE_PER_DAY'].toString()) ?? 0.0) + '/ngày',
-                                    style: const TextStyle(color: Color(0xFF1CE88A), fontSize: 13, fontWeight: FontWeight.w500),
-                                  ),
-                                ],
+                          );
+                        },
+                        child: Card(
+                          color: Colors.grey[900],
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+                          clipBehavior: Clip.antiAlias,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: (fullCarImageUrl != null)
+                                    ? Image.network(
+                                  fullCarImageUrl,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                  const Center(child: Icon(Icons.image_not_supported, color: Colors.grey, size: 40)),
+                                )
+                                    : const Center(child: Icon(Icons.directions_car, color: Colors.grey, size: 40)),
                               ),
-                            ),
-                          ],
+                              Padding(
+                                padding: const EdgeInsets.all(10.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "${car['BRAND'] ?? ''} ${car['MODEL'] ?? ''}",
+                                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      priceFormat.format(double.tryParse(car['PRICE_PER_DAY'].toString()) ?? 0.0) + '/ngày',
+                                      style: const TextStyle(color: Color(0xFF1CE88A), fontSize: 13, fontWeight: FontWeight.w500),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },
