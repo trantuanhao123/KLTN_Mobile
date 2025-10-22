@@ -2,13 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile/screens/home_screen.dart';
 import 'package:mobile/screens/profile_screen.dart';
 import 'package:mobile/screens/car_list_screen.dart';
-
-// Widget giữ chỗ
-class MyBookingScreen extends StatelessWidget {
-  const MyBookingScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const Scaffold(backgroundColor: Colors.black, body: Center(child: Text('Trang Lịch Đặt Của Tôi', style: TextStyle(color: Colors.white))));
-}
+import 'package:mobile/screens/my_booking_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -47,9 +41,9 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Trang chủ',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.directions_car_outlined), // Đổi icon cho phù hợp
+            icon: Icon(Icons.directions_car_outlined),
             activeIcon: Icon(Icons.directions_car),
-            label: 'Thuê xe', // Đổi tên cho phù hợp
+            label: 'Thuê xe',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.calendar_today_outlined),
@@ -64,11 +58,13 @@ class _MainScreenState extends State<MainScreen> {
         ],
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-        backgroundColor: Colors.black,
-        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.black, // Màu nền của BottomNavBar
+        type: BottomNavigationBarType.fixed, // Hiển thị tất cả label
         selectedItemColor: const Color(0xFF1CE88A),
-        unselectedItemColor: Colors.grey,
-        showUnselectedLabels: true,
+        unselectedItemColor: Colors.grey[600],
+        showUnselectedLabels: true, // Luôn hiển thị label
+        selectedFontSize: 12, // Cỡ chữ khi được chọn
+        unselectedFontSize: 12, // Cỡ chữ khi không được chọn
       ),
     );
   }

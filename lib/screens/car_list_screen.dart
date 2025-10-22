@@ -6,7 +6,9 @@ import 'package:mobile/api/api_service.dart';
 import 'package:mobile/screens/car_detail_screen.dart';
 
 class CarListScreen extends StatefulWidget {
-  const CarListScreen({super.key});
+  final String? initialBrandFilter;
+
+  const CarListScreen({super.key, this.initialBrandFilter});
 
   @override
   State<CarListScreen> createState() => _CarListScreenState();
@@ -14,9 +16,37 @@ class CarListScreen extends StatefulWidget {
 
 class _CarListScreenState extends State<CarListScreen> {
   final _searchController = TextEditingController();
+  String? _selectedBrand;
   int? _selectedCategoryId;
   int? _selectedBranchId;
   RangeValues _currentPriceRange = const RangeValues(0, 5000000);
+
+  String? _modalSelectedBrand;
+  int? _modalSelectedCategoryId;
+  int? _modalSelectedBranchId;
+  RangeValues _modalPriceRange = const RangeValues(0, 5000000);
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedBrand = widget.initialBrandFilter;
+    _modalSelectedBrand = _selectedBrand;
+    _modalPriceRange = _currentPriceRange;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final carProvider = Provider.of<CarProvider>(context, listen: false);
+      carProvider.applyFilters(
+        brandName: _selectedBrand,
+        searchTerm: _searchController.text,
+        categoryId: _selectedCategoryId,
+        branchId: _selectedBranchId,
+        priceRange: _currentPriceRange,
+      );
+      if (_selectedBrand != null) {
+        setState(() {});
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -25,6 +55,11 @@ class _CarListScreenState extends State<CarListScreen> {
   }
 
   void _showFilterModal(BuildContext context) {
+    _modalSelectedBrand = _selectedBrand;
+    _modalSelectedCategoryId = _selectedCategoryId;
+    _modalSelectedBranchId = _selectedBranchId;
+    _modalPriceRange = _currentPriceRange;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
@@ -36,6 +71,21 @@ class _CarListScreenState extends State<CarListScreen> {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             final carProvider = Provider.of<CarProvider>(context, listen: false);
+            final uniqueBrands = carProvider.allCars.map((c) => c['BRAND'] as String?).where((b) => b != null).toSet().toList();
+            uniqueBrands.sort();
+
+            InputDecoration dropdownDecoration(String hint) {
+              return InputDecoration(
+                hintText: hint,
+                hintStyle: const TextStyle(color: Colors.grey),
+                filled: true,
+                fillColor: Colors.grey[850],
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Color(0xFF1CE88A)), borderRadius: BorderRadius.circular(12)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              );
+            }
+
             return Padding(
               padding: EdgeInsets.only(
                 top: 24, left: 24, right: 24,
@@ -46,58 +96,80 @@ class _CarListScreenState extends State<CarListScreen> {
                 children: [
                   const Text("Bộ lọc", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
 
-                  DropdownButtonFormField<int>(
-                    value: _selectedCategoryId,
-                    hint: const Text("Tất cả loại xe"),
-                    decoration: InputDecoration(
-                      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey[700]!)),
-                      focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF1CE88A))),
-                    ),
-                    dropdownColor: Colors.grey[800],
-                    onChanged: (value) => setModalState(() => _selectedCategoryId = value),
-                    items: carProvider.categories.map<DropdownMenuItem<int>>((category) {
-                      return DropdownMenuItem<int>(
-                        value: category['CATEGORY_ID'],
-                        child: Text(category['NAME'], style: const TextStyle(color: Colors.white)),
-                      );
-                    }).toList(),
+                  DropdownButtonFormField<String>(
+                      value: _modalSelectedBrand,
+                      decoration: dropdownDecoration("Tất cả thương hiệu"),
+                      dropdownColor: Colors.grey[800],
+                      style: const TextStyle(color: Colors.white),
+                      iconEnabledColor: Colors.grey[400],
+                      isExpanded: true,
+                      onChanged: (value) => setModalState(() => _modalSelectedBrand = value),
+                      items: [
+                        const DropdownMenuItem<String>(value: null, child: Text("Tất cả thương hiệu", style: TextStyle(color: Colors.grey))),
+                        ...uniqueBrands.map<DropdownMenuItem<String>>((brand) {
+                          return DropdownMenuItem<String>(value: brand, child: Text(brand!));
+                        }).toList(),
+                      ]
                   ),
 
                   DropdownButtonFormField<int>(
-                    value: _selectedBranchId,
-                    hint: const Text("Tất cả chi nhánh"),
-                    decoration: InputDecoration(
-                      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey[700]!)),
-                      focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF1CE88A))),
-                    ),
-                    dropdownColor: Colors.grey[800],
-                    onChanged: (value) => setModalState(() => _selectedBranchId = value),
-                    items: carProvider.branches.map<DropdownMenuItem<int>>((branch) {
-                      return DropdownMenuItem<int>(
-                        value: branch['BRANCH_ID'],
-                        child: Text(branch['NAME'], style: const TextStyle(color: Colors.white)),
-                      );
-                    }).toList(),
+                      value: _modalSelectedCategoryId,
+                      decoration: dropdownDecoration("Tất cả loại xe"),
+                      dropdownColor: Colors.grey[800],
+                      style: const TextStyle(color: Colors.white),
+                      iconEnabledColor: Colors.grey[400],
+                      isExpanded: true,
+                      onChanged: (value) => setModalState(() => _modalSelectedCategoryId = value),
+                      items: [
+                        const DropdownMenuItem<int>(value: null, child: Text("Tất cả loại xe", style: TextStyle(color: Colors.grey))),
+                        ...carProvider.categories.map<DropdownMenuItem<int>>((category) {
+                          return DropdownMenuItem<int>(
+                            value: category['CATEGORY_ID'],
+                            child: Text(category['NAME'] ?? 'N/A'),
+                          );
+                        }).toList(),
+                      ]
+                  ),
+
+                  DropdownButtonFormField<int>(
+                      value: _modalSelectedBranchId,
+                      decoration: dropdownDecoration("Tất cả chi nhánh"),
+                      dropdownColor: Colors.grey[800],
+                      style: const TextStyle(color: Colors.white),
+                      iconEnabledColor: Colors.grey[400],
+                      isExpanded: true,
+                      onChanged: (value) => setModalState(() => _modalSelectedBranchId = value),
+                      items: [
+                        const DropdownMenuItem<int>(value: null, child: Text("Tất cả chi nhánh", style: TextStyle(color: Colors.grey))),
+                        ...carProvider.branches.map<DropdownMenuItem<int>>((branch) {
+                          return DropdownMenuItem<int>(
+                            value: branch['BRANCH_ID'],
+                            child: Text(branch['NAME'] ?? 'N/A'),
+                          );
+                        }).toList(),
+                      ]
                   ),
 
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Giá thuê: ${NumberFormat.simpleCurrency(locale: 'vi-VN', decimalDigits: 0).format(_currentPriceRange.start)} - ${NumberFormat.simpleCurrency(locale: 'vi-VN', decimalDigits: 0).format(_currentPriceRange.end)}',
+                        'Giá thuê/ngày: ${NumberFormat.simpleCurrency(locale: 'vi-VN', decimalDigits: 0).format(_modalPriceRange.start)} - ${NumberFormat.simpleCurrency(locale: 'vi-VN', decimalDigits: 0).format(_modalPriceRange.end)}',
                         style: const TextStyle(color: Colors.white),
                       ),
                       RangeSlider(
-                        values: _currentPriceRange,
+                        values: _modalPriceRange,
                         min: 0, max: 10000000,
                         divisions: 20,
                         activeColor: const Color(0xFF1CE88A),
+                        inactiveColor: Colors.grey[700],
+                        // SỬA LỖI: Xóa `const` khỏi RangeLabels
                         labels: RangeLabels(
-                          NumberFormat.compactSimpleCurrency(locale: 'vi-VN').format(_currentPriceRange.start),
-                          NumberFormat.compactSimpleCurrency(locale: 'vi-VN').format(_currentPriceRange.end),
+                          NumberFormat.compactSimpleCurrency(locale: 'vi-VN', decimalDigits: 0).format(_modalPriceRange.start),
+                          NumberFormat.compactSimpleCurrency(locale: 'vi-VN', decimalDigits: 0).format(_modalPriceRange.end),
                         ),
                         onChanged: (values) {
-                          setModalState(() => _currentPriceRange = values);
+                          setModalState(() => _modalPriceRange = values);
                         },
                       ),
                     ],
@@ -108,27 +180,35 @@ class _CarListScreenState extends State<CarListScreen> {
                     children: [
                       TextButton(
                         onPressed: () {
-                          setState(() {
-                            _selectedCategoryId = null;
-                            _selectedBranchId = null;
-                            _currentPriceRange = const RangeValues(0, 5000000);
-                          });
                           setModalState(() {
+                            _modalSelectedBrand = null;
+                            _modalSelectedCategoryId = null;
+                            _modalSelectedBranchId = null;
+                            _modalPriceRange = const RangeValues(0, 5000000);
+                          });
+                          setState(() {
+                            _selectedBrand = null;
                             _selectedCategoryId = null;
                             _selectedBranchId = null;
                             _currentPriceRange = const RangeValues(0, 5000000);
+                            _searchController.clear();
                           });
-                          Provider.of<CarProvider>(context, listen: false).applyFilters(
-                            searchTerm: _searchController.text,
-                          );
+                          Provider.of<CarProvider>(context, listen: false).applyFilters();
+                          Navigator.pop(context);
                         },
                         child: const Text("Xóa bộ lọc", style: TextStyle(color: Colors.white)),
                       ),
                       ElevatedButton(
                         onPressed: () {
-                          setState(() {});
+                          setState(() {
+                            _selectedBrand = _modalSelectedBrand;
+                            _selectedCategoryId = _modalSelectedCategoryId;
+                            _selectedBranchId = _modalSelectedBranchId;
+                            _currentPriceRange = _modalPriceRange;
+                          });
                           Provider.of<CarProvider>(context, listen: false).applyFilters(
                             searchTerm: _searchController.text,
+                            brandName: _selectedBrand,
                             categoryId: _selectedCategoryId,
                             branchId: _selectedBranchId,
                             priceRange: _currentPriceRange,
@@ -156,9 +236,13 @@ class _CarListScreenState extends State<CarListScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text("Thuê Xe", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text(
+            _selectedBrand ?? "Thuê Xe",
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+        ),
         backgroundColor: Colors.black,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list, color: Colors.white),
@@ -168,22 +252,22 @@ class _CarListScreenState extends State<CarListScreen> {
       ),
       body: Consumer<CarProvider>(
         builder: (context, carProvider, child) {
-          if (carProvider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
+          if (carProvider.isLoading && carProvider.filteredCars.isEmpty) {
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF1CE88A)));
           }
           if (carProvider.error != null) {
-            return Center(child: Text(carProvider.error!, style: const TextStyle(color: Colors.red)));
+            return Center(child: Text('Lỗi: ${carProvider.error!}', style: const TextStyle(color: Colors.red)));
           }
 
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
                 child: TextField(
                   controller: _searchController,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    hintText: 'Tìm theo tên, hãng xe...',
+                    hintText: 'Tìm theo tên, hãng, biển số...',
                     hintStyle: TextStyle(color: Colors.grey[600]),
                     prefixIcon: const Icon(Icons.search, color: Colors.grey),
                     filled: true,
@@ -192,10 +276,12 @@ class _CarListScreenState extends State<CarListScreen> {
                       borderRadius: BorderRadius.circular(30.0),
                       borderSide: BorderSide.none,
                     ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   ),
                   onChanged: (value) {
                     carProvider.applyFilters(
                       searchTerm: value,
+                      brandName: _selectedBrand,
                       categoryId: _selectedCategoryId,
                       branchId: _selectedBranchId,
                       priceRange: _currentPriceRange,
@@ -203,12 +289,22 @@ class _CarListScreenState extends State<CarListScreen> {
                   },
                 ),
               ),
-
               Expanded(
                 child: carProvider.filteredCars.isEmpty
                     ? RefreshIndicator(
-                  onRefresh: () => carProvider.fetchAllData(),
+                  onRefresh: () => carProvider.fetchAllData().then((_){
+                    carProvider.applyFilters(
+                      searchTerm: _searchController.text,
+                      brandName: _selectedBrand,
+                      categoryId: _selectedCategoryId,
+                      branchId: _selectedBranchId,
+                      priceRange: _currentPriceRange,
+                    );
+                  }),
+                  color: const Color(0xFF1CE88A),
+                  backgroundColor: Colors.grey[900],
                   child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     children: const [
                       SizedBox(height: 150),
                       Center(child: Text("Không tìm thấy xe phù hợp", style: TextStyle(color: Colors.grey))),
@@ -216,9 +312,19 @@ class _CarListScreenState extends State<CarListScreen> {
                   ),
                 )
                     : RefreshIndicator(
-                  onRefresh: () => carProvider.fetchAllData(),
+                  onRefresh: () => carProvider.fetchAllData().then((_){
+                    carProvider.applyFilters(
+                      searchTerm: _searchController.text,
+                      brandName: _selectedBrand,
+                      categoryId: _selectedCategoryId,
+                      branchId: _selectedBranchId,
+                      priceRange: _currentPriceRange,
+                    );
+                  }),
+                  color: const Color(0xFF1CE88A),
+                  backgroundColor: Colors.grey[900],
                   child: GridView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       crossAxisSpacing: 16.0,
@@ -231,6 +337,7 @@ class _CarListScreenState extends State<CarListScreen> {
                       final priceFormat = NumberFormat.simpleCurrency(locale: 'vi-VN', decimalDigits: 0);
                       final imageUrl = car['mainImageUrl'];
                       final fullCarImageUrl = imageUrl != null ? "$baseUrl/images/$imageUrl" : null;
+                      final pricePerDay = double.tryParse(car['PRICE_PER_DAY']?.toString() ?? '0.0') ?? 0.0;
 
                       return GestureDetector(
                         onTap: () {
@@ -249,15 +356,21 @@ class _CarListScreenState extends State<CarListScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(
-                                child: (fullCarImageUrl != null)
-                                    ? Image.network(
-                                  fullCarImageUrl,
+                                child: SizedBox(
                                   width: double.infinity,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                  const Center(child: Icon(Icons.image_not_supported, color: Colors.grey, size: 40)),
-                                )
-                                    : const Center(child: Icon(Icons.directions_car, color: Colors.grey, size: 40)),
+                                  child: (fullCarImageUrl != null)
+                                      ? Image.network(
+                                    fullCarImageUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                    const Center(child: Icon(Icons.broken_image_outlined, color: Colors.grey, size: 40)),
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.grey[700]));
+                                    },
+                                  )
+                                      : const Center(child: Icon(Icons.directions_car, color: Colors.grey, size: 40)),
+                                ),
                               ),
                               Padding(
                                 padding: const EdgeInsets.all(10.0),
@@ -272,7 +385,7 @@ class _CarListScreenState extends State<CarListScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      priceFormat.format(double.tryParse(car['PRICE_PER_DAY'].toString()) ?? 0.0) + '/ngày',
+                                      priceFormat.format(pricePerDay) + '/ngày',
                                       style: const TextStyle(color: Color(0xFF1CE88A), fontSize: 13, fontWeight: FontWeight.w500),
                                     ),
                                   ],

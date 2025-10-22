@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile/api/api_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:mobile/screens/verify_registration_otp_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -32,27 +33,34 @@ class _SignupScreenState extends State<SignupScreen> {
 
     final apiService = ApiService();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final email = _emailController.text.trim();
 
     try {
-      await apiService.register(
-        fullname: _fullnameController.text,
-        email: _emailController.text,
-        phone: _phoneController.text,
+      final result = await apiService.register(
+        fullname: _fullnameController.text.trim(),
+        email: email,
+        phone: _phoneController.text.trim(),
         password: _passwordController.text,
       );
 
       scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text('Đăng ký thành công! Vui lòng đăng nhập.'),
+        SnackBar(
+          content: Text(result['message'] ?? 'Đã gửi mã OTP. Vui lòng kiểm tra email.'),
           backgroundColor: Colors.green,
         ),
       );
 
       if (mounted) {
-        Navigator.of(context).pop();
+        navigator.push(
+          MaterialPageRoute(
+            builder: (context) => VerifyRegistrationOtpScreen(email: email), // Chuyển sang xác thực OTP
+          ),
+        );
       }
 
     } catch (e) {
+      if (!mounted) return;
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text('Lỗi: ${e.toString().replaceFirst("Exception: ", "")}'),
@@ -64,6 +72,16 @@ class _SignupScreenState extends State<SignupScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _fullnameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -99,26 +117,31 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 const SizedBox(height: 48),
 
-                // --- CÁC TRƯỜNG NHẬP LIỆU ---
                 _buildTextField(
                   controller: _fullnameController,
                   label: 'Họ và Tên',
                   keyboardType: TextInputType.name,
-                  validator: (value) => (value == null || value.isEmpty) ? 'Vui lòng nhập họ tên' : null,
+                  validator: (value) => (value == null || value.trim().isEmpty) ? 'Vui lòng nhập họ tên' : null,
                 ),
                 const SizedBox(height: 24),
                 _buildTextField(
-                  controller: _emailController,
-                  label: 'Địa chỉ Email',
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) => (value == null || !value.contains('@')) ? 'Vui lòng nhập email hợp lệ' : null,
+                    controller: _emailController,
+                    label: 'Địa chỉ Email',
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return 'Vui lòng nhập email';
+                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                        return 'Vui lòng nhập email hợp lệ';
+                      }
+                      return null;
+                    }
                 ),
                 const SizedBox(height: 24),
                 _buildTextField(
                   controller: _phoneController,
                   label: 'Số điện thoại',
                   keyboardType: TextInputType.phone,
-                  validator: (value) => (value == null || value.isEmpty) ? 'Vui lòng nhập số điện thoại' : null,
+                  validator: (value) => (value == null || value.trim().isEmpty) ? 'Vui lòng nhập số điện thoại' : null,
                 ),
                 const SizedBox(height: 24),
                 _buildTextField(
@@ -133,11 +156,14 @@ class _SignupScreenState extends State<SignupScreen> {
                   label: 'Xác nhận Mật khẩu',
                   isPassword: true,
                   isConfirm: true,
-                  validator: (value) => (value != _passwordController.text) ? 'Mật khẩu không khớp' : null,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Vui lòng xác nhận mật khẩu';
+                    if (value != _passwordController.text) return 'Mật khẩu không khớp';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 40),
 
-                // --- NÚT ĐĂNG KÝ CHÍNH ---
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -146,6 +172,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       backgroundColor: const Color(0xFF1CE88A),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      disabledBackgroundColor: Colors.grey[700], // Màu khi disable
                     ),
                     child: _isLoading
                         ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 3))
@@ -154,7 +181,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                // --- DẢI PHÂN CÁCH VÀ CÁC NÚT MẠNG XÃ HỘI ---
                 Row(
                   children: [
                     Expanded(child: Divider(color: Colors.grey[800])),
@@ -169,17 +195,20 @@ class _SignupScreenState extends State<SignupScreen> {
                 _buildSocialButton(
                   icon: Image.asset('assets/google_logo.png', height: 24),
                   text: 'Đăng ký với Google',
-                  onPressed: () {},
+                  onPressed: () {
+                    // TODO: Implement Google Sign up
+                  },
                 ),
                 const SizedBox(height: 16),
                 _buildSocialButton(
                   icon: const FaIcon(FontAwesomeIcons.facebook, color: Color(0xFF1877F2), size: 28),
                   text: 'Đăng ký với Facebook',
-                  onPressed: () {},
+                  onPressed: () {
+                    // TODO: Implement Facebook Sign up
+                  },
                 ),
                 const SizedBox(height: 48),
 
-                // --- ĐIỀU HƯỚNG VỀ MÀN HÌNH ĐĂNG NHẬP ---
                 Align(
                   alignment: Alignment.center,
                   child: RichText(
@@ -192,7 +221,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           style: const TextStyle(color: Color(0xFF1CE88A), fontWeight: FontWeight.bold),
                           recognizer: TapGestureRecognizer()
                             ..onTap = () {
-                              Navigator.of(context).pop();
+                              Navigator.of(context).pop(); // Quay lại màn hình đăng nhập
                             },
                         ),
                       ],
@@ -208,7 +237,6 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // Widget con để xây dựng các trường nhập liệu (Không thay đổi)
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -217,7 +245,6 @@ class _SignupScreenState extends State<SignupScreen> {
     bool isConfirm = false,
     TextInputType keyboardType = TextInputType.text,
   }) {
-    // ... (Giữ nguyên code của hàm này từ trước)
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -250,8 +277,8 @@ class _SignupScreenState extends State<SignupScreen> {
                 ? IconButton(
               icon: Icon(
                 (isConfirm ? _isConfirmPasswordVisible : _isPasswordVisible)
-                    ? Icons.visibility_off
-                    : Icons.visibility,
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
                 color: Colors.grey,
               ),
               onPressed: () {
@@ -272,7 +299,6 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // Widget con để xây dựng các nút đăng nhập mạng xã hội (Không thay đổi)
   Widget _buildSocialButton({
     required Widget icon,
     required String text,
