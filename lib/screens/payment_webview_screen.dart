@@ -15,17 +15,20 @@ class PaymentWebViewScreen extends StatefulWidget {
 class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
   late final WebViewController _controller;
   bool _isLoading = true;
+  double _progress = 0;
+  bool _hasError = false;
 
   @override
   void initState() {
     super.initState();
 
-    // Cấu hình WebView cho từng nền tảng
+    // --- Khởi tạo controller tuỳ nền tảng ---
     late final PlatformWebViewControllerCreationParams params;
 
     if (WebViewPlatform.instance is WebKitWebViewPlatform) {
       params = WebKitWebViewControllerCreationParams(
         allowsInlineMediaPlayback: true,
+        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
       );
     } else {
       params = const PlatformWebViewControllerCreationParams();
@@ -33,20 +36,40 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
 
     final controller = WebViewController.fromPlatformCreationParams(params)
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0x00000000))
+      ..setBackgroundColor(Colors.transparent)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (_) => setState(() => _isLoading = true),
-          onPageFinished: (_) => setState(() => _isLoading = false),
-          onWebResourceError: (error) {
-            print('Lỗi tải trang: ${error.description}');
-            Navigator.pop(context, 'error');
+          onProgress: (progress) {
+            if (!mounted) return;
+            setState(() => _progress = progress / 100);
           },
-          onNavigationRequest: (request) {
-            if (request.url.contains('/payment/success')) {
+          onPageStarted: (_) {
+            if (!mounted) return;
+            setState(() {
+              _isLoading = true;
+              _hasError = false;
+              _progress = 0;
+            });
+          },
+          onPageFinished: (_) {
+            if (!mounted) return;
+            setState(() => _isLoading = false);
+          },
+          onWebResourceError: (error) {
+            debugPrint('WebView error: ${error.description}');
+            if (!mounted) return;
+            setState(() {
+              _hasError = true;
+              _isLoading = false;
+            });
+          },
+          onNavigationRequest: (NavigationRequest request) {
+            final uri = Uri.parse(request.url);
+            debugPrint('Navigating to ${request.url}');
+            if (uri.path == '/result') {
               Navigator.pop(context, 'success');
               return NavigationDecision.prevent;
-            } else if (request.url.contains('/payment/cancel')) {
+            } else if (uri.path == '/cancel') {
               Navigator.pop(context, 'cancelled');
               return NavigationDecision.prevent;
             }
@@ -56,26 +79,76 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
       )
       ..loadRequest(Uri.parse(widget.url));
 
+    // --- Cấu hình riêng cho Android ---
+    if (controller.platform is AndroidWebViewController) {
+      AndroidWebViewController.enableDebugging(true);
+      (controller.platform as AndroidWebViewController)
+          .setMediaPlaybackRequiresUserGesture(false);
+    }
+
     _controller = controller;
+  }
+
+  Future<void> _reload() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+    await _controller.reload();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Thanh toán', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: Stack(
-        children: [
-          WebViewWidget(controller: _controller),
-          if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF1CE88A),
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            if (_hasError)
+              _buildErrorView()
+            else
+              WebViewWidget(controller: _controller),
+
+            // --- Thanh tiến trình ---
+            if (_isLoading || _progress < 1)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: LinearProgressIndicator(
+                  value: _progress,
+                  backgroundColor: Colors.grey[900],
+                  valueColor: const AlwaysStoppedAnimation(Color(0xFF1CE88A)),
+                  minHeight: 3,
+                ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.wifi_off, color: Colors.white70, size: 64),
+          const SizedBox(height: 16),
+          const Text(
+            'Không thể tải trang thanh toán',
+            style: TextStyle(color: Colors.white70, fontSize: 16),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _reload,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Thử lại'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1CE88A),
+              foregroundColor: Colors.black,
             ),
+          ),
         ],
       ),
     );
