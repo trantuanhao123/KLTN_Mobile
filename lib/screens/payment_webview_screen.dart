@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
 class PaymentWebViewScreen extends StatefulWidget {
   final String url;
-
   const PaymentWebViewScreen({super.key, required this.url});
 
   @override
@@ -15,140 +12,114 @@ class PaymentWebViewScreen extends StatefulWidget {
 class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
   late final WebViewController _controller;
   bool _isLoading = true;
-  double _progress = 0;
-  bool _hasError = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-
-    // --- Khởi tạo controller tuỳ nền tảng ---
-    late final PlatformWebViewControllerCreationParams params;
-
-    if (WebViewPlatform.instance is WebKitWebViewPlatform) {
-      params = WebKitWebViewControllerCreationParams(
-        allowsInlineMediaPlayback: true,
-        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
-      );
-    } else {
-      params = const PlatformWebViewControllerCreationParams();
-    }
-
-    final controller = WebViewController.fromPlatformCreationParams(params)
+    _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.transparent)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onProgress: (progress) {
-            if (!mounted) return;
-            setState(() => _progress = progress / 100);
+          onProgress: (int progress) {
+            // Cập nhật thanh tải (nếu có)
           },
-          onPageStarted: (_) {
-            if (!mounted) return;
+          onPageStarted: (String url) {
             setState(() {
               _isLoading = true;
-              _hasError = false;
-              _progress = 0;
+              _error = null;
             });
           },
-          onPageFinished: (_) {
-            if (!mounted) return;
+          onPageFinished: (String url) {
             setState(() => _isLoading = false);
           },
-          onWebResourceError: (error) {
-            debugPrint('WebView error: ${error.description}');
-            if (!mounted) return;
-            setState(() {
-              _hasError = true;
-              _isLoading = false;
-            });
-          },
-          onNavigationRequest: (NavigationRequest request) {
-            final uri = Uri.parse(request.url);
-            debugPrint('Navigating to ${request.url}');
-            if (uri.path == '/result') {
-              Navigator.pop(context, 'success');
-              return NavigationDecision.prevent;
-            } else if (uri.path == '/cancel') {
-              Navigator.pop(context, 'cancelled');
-              return NavigationDecision.prevent;
+
+          // SỬA ĐỔI QUAN TRỌNG Ở ĐÂY
+          onUrlChange: (UrlChange change) {
+            final newUrl = change.url;
+            if (newUrl != null && newUrl.contains('payment-result')) {
+              // Phân tích URL để lấy các tham số query
+              final uri = Uri.parse(newUrl);
+
+              final isCancelled = uri.queryParameters['cancel']; // 'true' hoặc null
+              final status = uri.queryParameters['status'];     // 'PAID', 'CANCELLED', 'FAILED'
+
+              print('PayOS Redirect URL: $newUrl'); // Dành cho debug
+              print('PayOS Status: $status, Cancel: $isCancelled');
+
+              if (isCancelled == 'true') {
+                // Trường hợp 1: Người dùng nhấn "Hủy"
+                Navigator.pop(context, 'cancelled');
+              } else if (status == 'PAID') {
+                // Trường hợp 2: Thanh toán thành công
+                Navigator.pop(context, 'success');
+              } else if (status == 'CANCELLED' || status == 'FAILED') {
+                // Trường hợp 3: Thanh toán thất bại (hết hạn, từ chối...)
+                Navigator.pop(context, 'error');
+              }
+              // Nếu không phải 3 trường hợp trên, WebView sẽ tiếp tục tải trang
             }
-            return NavigationDecision.navigate;
+          },
+
+          onWebResourceError: (WebResourceError error) {
+            setState(() {
+              _isLoading = false;
+              _error = "Lỗi tải trang: ${error.description}";
+            });
           },
         ),
       )
       ..loadRequest(Uri.parse(widget.url));
-
-    // --- Cấu hình riêng cho Android ---
-    if (controller.platform is AndroidWebViewController) {
-      AndroidWebViewController.enableDebugging(true);
-      (controller.platform as AndroidWebViewController)
-          .setMediaPlaybackRequiresUserGesture(false);
-    }
-
-    _controller = controller;
-  }
-
-  Future<void> _reload() async {
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-    });
-    await _controller.reload();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            if (_hasError)
-              _buildErrorView()
-            else
-              WebViewWidget(controller: _controller),
-
-            // --- Thanh tiến trình ---
-            if (_isLoading || _progress < 1)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: LinearProgressIndicator(
-                  value: _progress,
-                  backgroundColor: Colors.grey[900],
-                  valueColor: const AlwaysStoppedAnimation(Color(0xFF1CE88A)),
-                  minHeight: 3,
-                ),
+      appBar: AppBar(
+        title: const Text('Thanh toán', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                backgroundColor: Colors.grey[900],
+                title: Text('Hủy thanh toán?', style: TextStyle(color: Colors.white)),
+                content: Text('Bạn có chắc chắn muốn hủy giao dịch này?', style: TextStyle(color: Colors.grey)),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context), // Đóng dialog
+                    child: Text('Không', style: TextStyle(color: Colors.grey)),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context); // Đóng dialog
+                      Navigator.pop(context, 'cancelled'); // Quay về màn hình trước
+                    },
+                    child: Text('Đồng ý Hủy', style: TextStyle(color: Colors.orange)),
+                  ),
+                ],
               ),
-          ],
+            );
+          },
         ),
       ),
-    );
-  }
-
-  Widget _buildErrorView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      body: Stack(
         children: [
-          const Icon(Icons.wifi_off, color: Colors.white70, size: 64),
-          const SizedBox(height: 16),
-          const Text(
-            'Không thể tải trang thanh toán',
-            style: TextStyle(color: Colors.white70, fontSize: 16),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: _reload,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Thử lại'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1CE88A),
-              foregroundColor: Colors.black,
+          if (_error != null)
+            Center(
+              child: Text(_error!, style: const TextStyle(color: Colors.red)),
+            )
+          else
+            WebViewWidget(controller: _controller),
+
+          if (_isLoading)
+            const Center(
+              child: CircularProgressIndicator(color: Color(0xFF1CE88A)),
             ),
-          ),
         ],
       ),
     );
