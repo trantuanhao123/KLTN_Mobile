@@ -15,7 +15,7 @@ class ProfileScreen extends StatelessWidget {
         final user = userProvider.user;
         final avatarUrl = user?['AVATAR_URL'];
         // Xây dựng URL đầy đủ cho ảnh đại diện
-        final fullAvatarUrl = avatarUrl != null ? "http://192.168.1.5:8080/images/$avatarUrl" : null;
+        final fullAvatarUrl = avatarUrl != null ? "http://192.168.1.9:8080/images/$avatarUrl" : null;
 
         return Scaffold(
           backgroundColor: Colors.black,

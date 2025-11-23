@@ -5,53 +5,67 @@ import 'package:mime/mime.dart';
 import 'package:http_parser/http_parser.dart';
 
 class ApiService {
-  // URL cho API - *** NHỚ THAY ĐỔI NẾU CẦN ***
-  static const String _baseUrl = "http://192.168.1.5:8080";
-  static const int _timeoutSeconds = 30; // Thời gian chờ tối đa
+  // Thay đổi IP này thành IP máy tính của bạn
+  // Nếu dùng Emulator Android → dùng http://10.0.2.2:8080
+  static const String _baseUrl = "http://192.168.1.9:8080";
+  static const int _timeoutSeconds = 30;
 
   String get baseUrl => _baseUrl;
   final _storage = const FlutterSecureStorage();
 
-  // Hàm kiểm tra định dạng email
+  // ====================== HELPER ======================
+
   bool _isValidEmail(String email) {
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     return emailRegex.hasMatch(email);
   }
 
-  /// Lấy token JWT từ bộ nhớ an toàn.
-  Future<String?> getToken() async {
-    return await _storage.read(key: 'jwt_token');
-  }
+  Future<String?> getToken() async => await _storage.read(key: 'jwt_token');
 
-  /// Lưu token JWT vào bộ nhớ an toàn.
   Future<void> _saveToken(String token) async {
     if (token.isEmpty) throw Exception('Token không hợp lệ');
     await _storage.write(key: 'jwt_token', value: token);
   }
 
-  /// Xóa token JWT khỏi bộ nhớ an toàn.
-  Future<void> deleteToken() async {
-    await _storage.delete(key: 'jwt_token');
-  }
+  Future<void> deleteToken() async => await _storage.delete(key: 'jwt_token');
 
-  /// Tạo headers cho các yêu cầu cần xác thực.
-  /// [hasBody]: Chỉ thêm Content-Type nếu có body JSON.
   Future<Map<String, String>> _getHeaders({bool hasBody = false}) async {
-    String? token = await getToken();
+    final token = await getToken();
     return {
       if (hasBody) 'Content-Type': 'application/json; charset=UTF-8',
       if (token != null) 'Authorization': 'Bearer $token',
     };
   }
 
-  /// Ném lỗi nếu response là 401/403
   void _handleAuthError(http.Response response) {
     if (response.statusCode == 401 || response.statusCode == 403) {
-      throw Exception('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+      throw Exception('Phiên đăng nhập hết hạn (401). Vui lòng đăng nhập lại.');
     }
   }
 
-  /// Đăng nhập người dùng với email và mật khẩu, lưu token nếu thành công.
+  List<dynamic> _extractListFromResponse(http.Response response) {
+    _handleAuthError(response); // Kiểm tra token hết hạn trước
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      if (decoded is List) return decoded;
+      if (decoded is Map && decoded['data'] is List) return decoded['data'];
+      if (decoded is Map && decoded['rows'] is List) return decoded['rows'];
+      return [];
+    } else {
+      throw Exception('Lỗi tải dữ liệu: ${response.statusCode}');
+    }
+  }
+
+  Map<String, dynamic> _safeJsonDecode(String source) {
+    try {
+      return jsonDecode(source) as Map<String, dynamic>;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  // ====================== AUTH ======================
+
   Future<Map<String, dynamic>> login(String email, String password) async {
     if (!_isValidEmail(email)) throw Exception('Email không hợp lệ');
     if (password.isEmpty) throw Exception('Mật khẩu không được để trống');
@@ -69,7 +83,6 @@ class ApiService {
         final data = jsonDecode(response.body);
         if (data['token'] != null) {
           await _saveToken(data['token']);
-          // Debug token (xóa khi production)
           print('--- LOGIN SUCCESS TOKEN ---');
           print(data['token']);
           print('--- END LOGIN SUCCESS TOKEN ---');
@@ -83,14 +96,11 @@ class ApiService {
         throw Exception(error['error'] ?? 'Đăng nhập thất bại');
       }
     } catch (e) {
-      if (e is Exception && e.toString().contains('Tài khoản chưa được kích hoạt')) {
-        rethrow;
-      }
+      if (e is Exception && e.toString().contains('Tài khoản chưa được kích hoạt')) rethrow;
       throw Exception('Lỗi kết nối khi đăng nhập: ${e.toString()}');
     }
   }
 
-  /// Đăng ký người dùng mới. Chỉ gửi yêu cầu, không tự động đăng nhập.
   Future<Map<String, dynamic>> register({
     required String fullname,
     required String email,
@@ -116,18 +126,14 @@ class ApiService {
       )
           .timeout(Duration(seconds: _timeoutSeconds));
 
-      final responseData = jsonDecode(response.body);
-      if (response.statusCode == 201) {
-        return responseData;
-      } else {
-        throw Exception(responseData['error'] ?? 'Đăng ký thất bại (Code: ${response.statusCode})');
-      }
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 201) return data;
+      throw Exception(data['error'] ?? 'Đăng ký thất bại');
     } catch (e) {
       rethrow;
     }
   }
 
-  /// Xác thực OTP đăng ký và lấy token/user data.
   Future<Map<String, dynamic>> verifyRegistrationOtp({
     required String email,
     required String otp,
@@ -144,53 +150,37 @@ class ApiService {
       )
           .timeout(Duration(seconds: _timeoutSeconds));
 
-      final responseData = jsonDecode(response.body);
+      final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
-        if (responseData['token'] != null) {
-          await _saveToken(responseData['token']);
-        } else {
-          throw Exception('Xác thực thành công nhưng không nhận được token.');
-        }
-        return responseData;
-      } else {
-        throw Exception(responseData['message'] ?? 'Xác thực OTP thất bại (Code: ${response.statusCode})');
+        if (data['token'] != null) await _saveToken(data['token']);
+        return data;
       }
+      throw Exception(data['message'] ?? 'Xác thực OTP thất bại');
     } catch (e) {
       rethrow;
     }
   }
 
-  /// Đăng xuất người dùng bằng cách xóa token.
-  Future<void> logout() async {
-    await deleteToken();
-  }
+  Future<void> logout() async => await deleteToken();
 
-  /// Lấy thông tin hồ sơ người dùng.
+  // ====================== PROFILE ======================
+
   Future<Map<String, dynamic>> getUserProfile() async {
     try {
       final response = await http
-          .get(
-        Uri.parse('$baseUrl/user/profile'),
-        headers: await _getHeaders(),
-      )
+          .get(Uri.parse('$baseUrl/user/profile'), headers: await _getHeaders())
           .timeout(Duration(seconds: _timeoutSeconds));
 
       _handleAuthError(response);
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        final error = _safeJsonDecode(response.body);
-        throw Exception(error['error'] ?? error['message'] ?? 'Không thể lấy thông tin người dùng (${response.statusCode})');
-      }
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      throw Exception('Lỗi lấy profile');
     } catch (e) {
       rethrow;
     }
   }
 
-  /// Cập nhật hồ sơ người dùng với dữ liệu được cung cấp.
   Future<void> updateUserProfile(String userId, Map<String, dynamic> data) async {
     if (userId.isEmpty) throw Exception('ID người dùng không hợp lệ');
-
     try {
       final response = await http
           .put(
@@ -210,142 +200,117 @@ class ApiService {
     }
   }
 
-  /// Cập nhật ảnh đại diện của người dùng.
   Future<void> updateAvatar(String userId, String imagePath) async {
-    if (userId.isEmpty) throw Exception('ID người dùng không hợp lệ');
-    if (imagePath.isEmpty) throw Exception('Đường dẫn ảnh không hợp lệ');
-
+    if (userId.isEmpty || imagePath.isEmpty) throw Exception('Dữ liệu không hợp lệ');
     try {
-      var uri = Uri.parse('$baseUrl/user/editAvatar/$userId');
-      var request = http.MultipartRequest('POST', uri);
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/user/editAvatar/$userId'));
+      final mime = lookupMimeType(imagePath)?.split('/');
+      request.files.add(await http.MultipartFile.fromPath(
+        'avatar',
+        imagePath,
+        contentType: mime != null ? MediaType(mime[0], mime[1]) : null,
+      ));
 
-      final mimeTypeData = lookupMimeType(imagePath)?.split('/');
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'avatar',
-          imagePath,
-          contentType: mimeTypeData != null ? MediaType(mimeTypeData[0], mimeTypeData[1]) : null,
-        ),
-      );
-
-      String? token = await getToken();
+      final token = await getToken();
       if (token == null) throw Exception('Chưa đăng nhập');
       request.headers['Authorization'] = 'Bearer $token';
 
-      var response = await request.send().timeout(Duration(seconds: _timeoutSeconds));
-      final responseBody = await response.stream.bytesToString();
+      final streamedResponse = await request.send().timeout(Duration(seconds: _timeoutSeconds));
+      final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 401 || response.statusCode == 403) {
         throw Exception('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
       }
       if (response.statusCode != 200) {
-        final error = _safeJsonDecode(responseBody);
-        throw Exception(error['error'] ?? 'Tải ảnh lên thất bại (Code: ${response.statusCode})');
+        final error = _safeJsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Tải ảnh lên thất bại');
       }
     } catch (e) {
       rethrow;
     }
   }
 
-  /// Lấy danh sách các banner có trạng thái 'ACTIVE'.
+  // ====================== CÁC HÀM GET ĐÃ ĐƯỢC CẬP NHẬT (CÓ TOKEN) ======================
+
   Future<List<Map<String, dynamic>>> getBanners() async {
     try {
+      final headers = await _getHeaders();
       final response = await http
-          .get(Uri.parse('$baseUrl/banner'))
+          .get(Uri.parse('$baseUrl/banner'), headers: headers)
           .timeout(Duration(seconds: _timeoutSeconds));
 
-      if (response.statusCode == 200) {
-        final List<dynamic> allBanners = jsonDecode(response.body);
-        return allBanners
-            .where((banner) => banner['STATUS'] == 'ACTIVE')
-            .cast<Map<String, dynamic>>()
-            .toList();
-      } else {
-        throw Exception('Không thể tải danh sách banners');
-      }
+      final list = _extractListFromResponse(response);
+      return list
+          .where((item) => item['STATUS'] == 'ACTIVE')
+          .cast<Map<String, dynamic>>()
+          .toList();
     } catch (e) {
-      throw Exception('Lỗi kết nối: ${e.toString()}');
+      throw Exception('Lỗi kết nối banner: ${e.toString()}');
     }
   }
 
-  /// Lấy danh sách các xe.
   Future<List<Map<String, dynamic>>> getCars() async {
     try {
+      final headers = await _getHeaders();
       final response = await http
-          .get(Uri.parse('$baseUrl/car'))
+          .get(Uri.parse('$baseUrl/car'), headers: headers)
           .timeout(Duration(seconds: _timeoutSeconds));
 
-      if (response.statusCode == 200) {
-        return (jsonDecode(response.body) as List<dynamic>).cast<Map<String, dynamic>>();
-      } else {
-        throw Exception('Không thể tải danh sách xe');
-      }
+      final list = _extractListFromResponse(response);
+      return list.cast<Map<String, dynamic>>().toList();
     } catch (e) {
-      throw Exception('Lỗi kết nối: ${e.toString()}');
+      throw Exception('Lỗi kết nối xe: ${e.toString()}');
     }
   }
 
-  /// Lấy danh sách các loại xe.
   Future<List<Map<String, dynamic>>> getCategories() async {
     try {
+      final headers = await _getHeaders();
       final response = await http
-          .get(Uri.parse('$baseUrl/category'))
+          .get(Uri.parse('$baseUrl/category'), headers: headers)
           .timeout(Duration(seconds: _timeoutSeconds));
 
-      if (response.statusCode == 200) {
-        return (jsonDecode(response.body) as List<dynamic>).cast<Map<String, dynamic>>();
-      } else {
-        throw Exception('Không thể tải danh sách loại xe');
-      }
+      final list = _extractListFromResponse(response);
+      return list.cast<Map<String, dynamic>>().toList();
     } catch (e) {
-      throw Exception('Lỗi kết nối: ${e.toString()}');
+      throw Exception('Lỗi kết nối loại xe: ${e.toString()}');
     }
   }
 
-  /// Lấy danh sách các chi nhánh.
   Future<List<Map<String, dynamic>>> getBranches() async {
     try {
+      final headers = await _getHeaders();
       final response = await http
-          .get(Uri.parse('$baseUrl/branch'))
+          .get(Uri.parse('$baseUrl/branch'), headers: headers)
           .timeout(Duration(seconds: _timeoutSeconds));
 
-      if (response.statusCode == 200) {
-        return (jsonDecode(response.body) as List<dynamic>).cast<Map<String, dynamic>>();
-      } else {
-        throw Exception('Không thể tải danh sách chi nhánh');
-      }
+      final list = _extractListFromResponse(response);
+      return list.cast<Map<String, dynamic>>().toList();
     } catch (e) {
-      throw Exception('Lỗi kết nối: ${e.toString()}');
+      throw Exception('Lỗi kết nối chi nhánh: ${e.toString()}');
     }
   }
 
-  /// Yêu cầu đặt lại mật khẩu cho email được cung cấp.
+  // ====================== CÁC HÀM KHÁC (GIỮ NGUYÊN) ======================
+
   Future<void> requestPasswordReset(String email) async {
     if (!_isValidEmail(email)) throw Exception('Email không hợp lệ');
-
     try {
       final response = await http
-          .post(
-        Uri.parse('$baseUrl/auth/request-reset'),
-        headers: {'Content-Type': 'application/json; charset=UTF-8'},
-        body: jsonEncode({'email': email}),
-      )
+          .post(Uri.parse('$baseUrl/auth/request-reset'), headers: {'Content-Type': 'application/json; charset=UTF-8'}, body: jsonEncode({'email': email}))
           .timeout(Duration(seconds: _timeoutSeconds));
 
       if (response.statusCode != 200) {
-        final errorData = _safeJsonDecode(response.body);
-        if (response.statusCode == 404) {
-          throw Exception('Email không tồn tại trong hệ thống.');
-        }
-        throw Exception(errorData['message'] ?? 'Yêu cầu thất bại');
+        final error = _safeJsonDecode(response.body);
+        if (response.statusCode == 404) throw Exception('Email không tồn tại trong hệ thống.');
+        throw Exception(error['message'] ?? 'Yêu cầu thất bại');
       }
     } catch (e) {
       if (e is Exception && e.toString().contains('Email không tồn tại')) rethrow;
-      throw Exception('Lỗi kết nối hoặc xử lý: ${e.toString()}');
+      throw Exception('Lỗi kết nối: ${e.toString()}');
     }
   }
 
-  /// Xác thực OTP và đặt lại mật khẩu.
   Future<void> verifyOtpAndResetPassword({
     required String email,
     required String otp,
@@ -357,27 +322,19 @@ class ApiService {
 
     try {
       final response = await http
-          .post(
-        Uri.parse('$baseUrl/auth/verify-otp'),
-        headers: {'Content-Type': 'application/json; charset=UTF-8'},
-        body: jsonEncode({'email': email, 'otp': otp, 'newPassword': newPassword}),
-      )
+          .post(Uri.parse('$baseUrl/auth/verify-otp'), headers: {'Content-Type': 'application/json; charset=UTF-8'}, body: jsonEncode({'email': email, 'otp': otp, 'newPassword': newPassword}))
           .timeout(Duration(seconds: _timeoutSeconds));
 
       if (response.statusCode != 200) {
-        final errorData = _safeJsonDecode(response.body);
-        throw Exception(errorData['message'] ?? 'Xác thực thất bại');
+        final error = _safeJsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Xác thực thất bại');
       }
     } catch (e) {
-      if (e is Exception &&
-          (e.toString().contains('OTP không hợp lệ') || e.toString().contains('Email không tồn tại'))) {
-        rethrow;
-      }
-      throw Exception('Lỗi kết nối hoặc xử lý: ${e.toString()}');
+      if (e is Exception && (e.toString().contains('OTP không hợp lệ') || e.toString().contains('Email không tồn tại'))) rethrow;
+      throw Exception('Lỗi kết nối: ${e.toString()}');
     }
   }
 
-  /// Tạo đơn hàng và lấy link thanh toán PayOS
   Future<String> createOrderAndGetPaymentLink({
     required int carId,
     required String startDate,
@@ -387,7 +344,6 @@ class ApiService {
     String? discountCode,
   }) async {
     if (carId <= 0) throw Exception('ID xe không hợp lệ');
-
     try {
       final response = await http
           .post(
@@ -407,158 +363,137 @@ class ApiService {
       _handleAuthError(response);
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        if (data['checkoutUrl'] != null) {
-          return data['checkoutUrl'];
-        } else {
-          throw Exception('Không nhận được link thanh toán (checkoutUrl) từ backend.');
-        }
-      } else {
-        final error = _safeJsonDecode(response.body);
-        throw Exception(error['error'] ?? 'Tạo đơn hàng thất bại (Code: ${response.statusCode})');
+        return data['checkoutUrl'] ?? (throw Exception('Không có link thanh toán'));
       }
+      final error = _safeJsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Tạo đơn hàng thất bại');
     } catch (e) {
       rethrow;
     }
   }
 
-  /// Lấy lịch sử đặt xe của người dùng
   Future<List<dynamic>> getUserBookings() async {
     try {
-      final response = await http
-          .get(
-        Uri.parse('$baseUrl/order/login-orders'),
-        headers: await _getHeaders(),
-      )
-          .timeout(Duration(seconds: _timeoutSeconds));
-
+      final response = await http.get(Uri.parse('$baseUrl/order/login-orders'), headers: await _getHeaders()).timeout(Duration(seconds: _timeoutSeconds));
       _handleAuthError(response);
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body) as List<dynamic>;
-      } else {
-        throw Exception('Không thể tải lịch sử đặt xe (${response.statusCode})');
-      }
+      return response.statusCode == 200 ? jsonDecode(response.body) as List<dynamic> : throw Exception('Lỗi tải lịch sử đặt xe');
     } catch (e) {
       rethrow;
     }
   }
 
-  /// Kiểm tra mã giảm giá
   Future<Map<String, dynamic>> checkDiscountCode(String code) async {
     if (code.trim().isEmpty) throw Exception('Vui lòng nhập mã giảm giá');
-
     try {
       final response = await http
-          .post(
-        Uri.parse('$baseUrl/discount/check'),
-        headers: await _getHeaders(hasBody: true),
-        body: jsonEncode({'code': code.trim().toUpperCase()}),
-      )
+          .post(Uri.parse('$baseUrl/discount/check'), headers: await _getHeaders(hasBody: true), body: jsonEncode({'code': code.trim().toUpperCase()}))
           .timeout(Duration(seconds: _timeoutSeconds));
 
       _handleAuthError(response);
-      final responseData = jsonDecode(response.body);
-      if (response.statusCode == 200 && responseData['status'] == 'success') {
-        return responseData['data'];
-      } else {
-        throw Exception(responseData['message'] ?? 'Kiểm tra mã thất bại');
-      }
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['status'] == 'success') return data['data'];
+      throw Exception(data['message'] ?? 'Kiểm tra mã thất bại');
     } catch (e) {
       rethrow;
     }
   }
 
-  /// Hủy đơn hàng dựa trên trạng thái (DÙNG PATCH)
-  Future<Map<String, dynamic>> cancelOrder(
-      int orderId,
-      String status, {
-        String? bankAccount,
-        String? bankName,
-      }) async {
+  Future<Map<String, dynamic>> cancelOrder(int orderId, String status, {String? bankAccount, String? bankName}) async {
     if (orderId <= 0) throw Exception('ID đơn hàng không hợp lệ');
-
     String endpoint;
     Map<String, dynamic>? body;
-    bool needsBody = false;
+    bool hasBody = false;
 
     if (status == 'PENDING') {
       endpoint = '$baseUrl/order/cancel-pending/$orderId';
     } else if (status == 'PAID_DEPOSIT') {
       endpoint = '$baseUrl/order/cancel-deposit/$orderId';
     } else if (status == 'PAID_FULL') {
-      endpoint = '$baseUrl/order/cancel-paid/$orderId';
-      if (bankAccount == null || bankName == null || bankAccount.trim().isEmpty || bankName.trim().isEmpty) {
-        throw Exception("Vui lòng cung cấp Số tài khoản và Tên ngân hàng để hoàn tiền.");
+      endpoint = '$baseUrl/order/cancel-paid/$orderId'; // Sửa lỗi typo "annull-paid"
+      if (bankAccount?.trim().isEmpty != false || bankName?.trim().isEmpty != false) {
+        throw Exception('Vui lòng cung cấp Số tài khoản và Tên ngân hàng để hoàn tiền.');
       }
-      body = {
-        'bankAccount': bankAccount.trim(),
-        'bankName': bankName.trim(),
-      };
-      needsBody = true;
+      body = {'bankAccount': bankAccount!.trim(), 'bankName': bankName!.trim()};
+      hasBody = true;
     } else {
       throw Exception('Không thể hủy đơn hàng ở trạng thái này ($status).');
     }
 
     try {
       final response = await http
-          .patch(
-        Uri.parse(endpoint),
-        headers: await _getHeaders(hasBody: needsBody),
-        body: needsBody ? jsonEncode(body) : null,
-      )
+          .patch(Uri.parse(endpoint), headers: await _getHeaders(hasBody: hasBody), body: hasBody ? jsonEncode(body) : null)
           .timeout(Duration(seconds: _timeoutSeconds));
 
       _handleAuthError(response);
-
-      final responseData = _safeJsonDecode(response.body);
-      if (response.statusCode == 200) {
-        return responseData;
-      } else {
-        throw Exception(
-            responseData['error'] ?? responseData['message'] ?? 'Hủy đơn thất bại (Code: ${response.statusCode})');
-      }
+      final data = _safeJsonDecode(response.body);
+      if (response.statusCode == 200) return data;
+      throw Exception(data['error'] ?? data['message'] ?? 'Hủy đơn thất bại');
     } catch (e) {
       rethrow;
     }
   }
 
-  /// Thay đổi ngày thuê (DÙNG PATCH)
-  Future<Map<String, dynamic>> changeOrderDate(
-      int orderId,
-      String newStartDate,
-      String newEndDate,
-      ) async {
+  Future<Map<String, dynamic>> changeOrderDate(int orderId, String newStartDate, String newEndDate) async {
     try {
       final response = await http
           .patch(
         Uri.parse('$baseUrl/order/change-date/$orderId'),
         headers: await _getHeaders(hasBody: true),
-        body: jsonEncode({
-          'newStartDate': newStartDate,
-          'newEndDate': newEndDate,
-        }),
+        body: jsonEncode({'newStartDate': newStartDate, 'newEndDate': newEndDate}),
       )
           .timeout(Duration(seconds: _timeoutSeconds));
 
       _handleAuthError(response);
-
-      final responseData = _safeJsonDecode(response.body);
-      if (response.statusCode == 200) {
-        return responseData;
-      } else {
-        throw Exception(
-            responseData['error'] ?? responseData['message'] ?? 'Đổi lịch thất bại (Code: ${response.statusCode})');
-      }
+      final data = _safeJsonDecode(response.body);
+      if (response.statusCode == 200) return data;
+      throw Exception(data['error'] ?? data['message'] ?? 'Đổi lịch thất bại');
     } catch (e) {
       rethrow;
     }
   }
-
-  // Hàm hỗ trợ: parse JSON an toàn
-  Map<String, dynamic> _safeJsonDecode(String source) {
+  Future<void> submitReview(int orderId, int rating, String content) async {
     try {
-      return jsonDecode(source) as Map<String, dynamic>;
-    } catch (_) {
-      return {};
+      final response = await http.post(
+        Uri.parse('$baseUrl/review'),
+        headers: await _getHeaders(hasBody: true),
+        body: jsonEncode({
+          'orderId': orderId,
+          'rating': rating,
+          'content': content
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return; // Thành công
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? error['message'] ?? 'Lỗi khi gửi đánh giá');
+      }
+    } catch (e) {
+      if (e.toString().contains("Exception:")) rethrow;
+      throw Exception('Lỗi kết nối: ${e.toString()}');
+    }
+  }
+  /// Lấy danh sách thông báo của người dùng
+  /// Gọi vào GET /notification
+  Future<List<dynamic>> getNotifications() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/notification'),
+        headers: await _getHeaders(),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        // Backend trả về trực tiếp mảng danh sách hoặc object chứa data
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) return decoded;
+        if (decoded is Map && decoded['data'] is List) return decoded['data'];
+        return [];
+      } else {
+        throw Exception('Lỗi tải thông báo: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Lỗi kết nối: $e');
     }
   }
 }

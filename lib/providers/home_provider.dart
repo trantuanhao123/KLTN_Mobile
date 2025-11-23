@@ -11,7 +11,6 @@ class HomeProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
-  // Getters
   List<dynamic> get banners => _banners;
   List<String> get brands => _brands;
   List<dynamic> get popularCars => _popularCars;
@@ -19,7 +18,7 @@ class HomeProvider with ChangeNotifier {
   String? get error => _error;
 
   HomeProvider() {
-    fetchHomeData();
+    // fetchHomeData();
   }
 
   Future<void> fetchHomeData() async {
@@ -28,26 +27,31 @@ class HomeProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Gọi đồng thời cả hai API
       final results = await Future.wait([
         _apiService.getBanners(),
         _apiService.getCars(),
       ]);
 
       _banners = results[0];
-      final allCars = results[1];
 
-      // Xử lý danh sách thương hiệu (brands)
-      // Lấy danh sách brand từ tất cả xe, sau đó dùng Set để loại bỏ các brand trùng lặp
+      // Xử lý dữ liệu xe
+      final allCars = results[1].map((car) {
+        // Map mainImageUrl sang key phổ thông để widget dễ dùng
+        car['image'] = car['mainImageUrl'] ?? '';
+        return car;
+      }).toList();
+
+      // Lấy danh sách thương hiệu (BRAND)
       final brandSet = <String>{};
       for (var car in allCars) {
+        // Kiểm tra null safety và ép kiểu String
         if (car['BRAND'] != null) {
-          brandSet.add(car['BRAND']);
+          brandSet.add(car['BRAND'].toString());
         }
       }
       _brands = brandSet.toList();
 
-      // Tạm thời lấy 4 xe đầu tiên làm xe phổ biến
+      // Lấy 4 xe đầu tiên làm xe phổ biến
       _popularCars = allCars.take(4).toList();
 
     } catch (e) {

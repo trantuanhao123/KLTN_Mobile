@@ -42,9 +42,6 @@ class _CarListScreenState extends State<CarListScreen> {
         branchId: _selectedBranchId,
         priceRange: _currentPriceRange,
       );
-      if (_selectedBrand != null) {
-        setState(() {});
-      }
     });
   }
 
@@ -71,8 +68,11 @@ class _CarListScreenState extends State<CarListScreen> {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             final carProvider = Provider.of<CarProvider>(context, listen: false);
-            final uniqueBrands = carProvider.allCars.map((c) => c['BRAND'] as String?).where((b) => b != null).toSet().toList();
-            uniqueBrands.sort();
+            final uniqueBrands = carProvider.allCars
+                .map((c) => c['BRAND'] as String?)
+                .where((b) => b != null)
+                .toSet()
+                .toList()..sort();
 
             InputDecoration dropdownDecoration(String hint) {
               return InputDecoration(
@@ -97,57 +97,47 @@ class _CarListScreenState extends State<CarListScreen> {
                   const Text("Bộ lọc", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
 
                   DropdownButtonFormField<String>(
-                      value: _modalSelectedBrand,
-                      decoration: dropdownDecoration("Tất cả thương hiệu"),
-                      dropdownColor: Colors.grey[800],
-                      style: const TextStyle(color: Colors.white),
-                      iconEnabledColor: Colors.grey[400],
-                      isExpanded: true,
-                      onChanged: (value) => setModalState(() => _modalSelectedBrand = value),
-                      items: [
-                        const DropdownMenuItem<String>(value: null, child: Text("Tất cả thương hiệu", style: TextStyle(color: Colors.grey))),
-                        ...uniqueBrands.map<DropdownMenuItem<String>>((brand) {
-                          return DropdownMenuItem<String>(value: brand, child: Text(brand!));
-                        }).toList(),
-                      ]
+                    value: _modalSelectedBrand,
+                    decoration: dropdownDecoration("Tất cả thương hiệu"),
+                    dropdownColor: Colors.grey[800],
+                    style: const TextStyle(color: Colors.white),
+                    iconEnabledColor: Colors.grey[400],
+                    isExpanded: true,
+                    onChanged: (value) => setModalState(() => _modalSelectedBrand = value),
+                    items: [
+                      const DropdownMenuItem<String>(value: null, child: Text("Tất cả thương hiệu", style: TextStyle(color: Colors.grey))),
+                      ...uniqueBrands.map((brand) => DropdownMenuItem<String>(value: brand, child: Text(brand!))),
+                    ],
                   ),
 
                   DropdownButtonFormField<int>(
-                      value: _modalSelectedCategoryId,
-                      decoration: dropdownDecoration("Tất cả loại xe"),
-                      dropdownColor: Colors.grey[800],
-                      style: const TextStyle(color: Colors.white),
-                      iconEnabledColor: Colors.grey[400],
-                      isExpanded: true,
-                      onChanged: (value) => setModalState(() => _modalSelectedCategoryId = value),
-                      items: [
-                        const DropdownMenuItem<int>(value: null, child: Text("Tất cả loại xe", style: TextStyle(color: Colors.grey))),
-                        ...carProvider.categories.map<DropdownMenuItem<int>>((category) {
-                          return DropdownMenuItem<int>(
-                            value: category['CATEGORY_ID'],
-                            child: Text(category['NAME'] ?? 'N/A'),
-                          );
-                        }).toList(),
-                      ]
+                    value: _modalSelectedCategoryId,
+                    decoration: dropdownDecoration("Tất cả loại xe"),
+                    dropdownColor: Colors.grey[800],
+                    style: const TextStyle(color: Colors.white),
+                    onChanged: (value) => setModalState(() => _modalSelectedCategoryId = value),
+                    items: [
+                      const DropdownMenuItem<int>(value: null, child: Text("Tất cả loại xe", style: TextStyle(color: Colors.grey))),
+                      ...carProvider.categories.map((c) => DropdownMenuItem<int>(
+                        value: c['CATEGORY_ID'],
+                        child: Text(c['NAME'] ?? 'N/A'),
+                      )),
+                    ],
                   ),
 
                   DropdownButtonFormField<int>(
-                      value: _modalSelectedBranchId,
-                      decoration: dropdownDecoration("Tất cả chi nhánh"),
-                      dropdownColor: Colors.grey[800],
-                      style: const TextStyle(color: Colors.white),
-                      iconEnabledColor: Colors.grey[400],
-                      isExpanded: true,
-                      onChanged: (value) => setModalState(() => _modalSelectedBranchId = value),
-                      items: [
-                        const DropdownMenuItem<int>(value: null, child: Text("Tất cả chi nhánh", style: TextStyle(color: Colors.grey))),
-                        ...carProvider.branches.map<DropdownMenuItem<int>>((branch) {
-                          return DropdownMenuItem<int>(
-                            value: branch['BRANCH_ID'],
-                            child: Text(branch['NAME'] ?? 'N/A'),
-                          );
-                        }).toList(),
-                      ]
+                    value: _modalSelectedBranchId,
+                    decoration: dropdownDecoration("Tất cả chi nhánh"),
+                    dropdownColor: Colors.grey[800],
+                    style: const TextStyle(color: Colors.white),
+                    onChanged: (value) => setModalState(() => _modalSelectedBranchId = value),
+                    items: [
+                      const DropdownMenuItem<int>(value: null, child: Text("Tất cả chi nhánh", style: TextStyle(color: Colors.grey))),
+                      ...carProvider.branches.map((b) => DropdownMenuItem<int>(
+                        value: b['BRANCH_ID'],
+                        child: Text(b['NAME'] ?? 'N/A'),
+                      )),
+                    ],
                   ),
 
                   Column(
@@ -159,18 +149,16 @@ class _CarListScreenState extends State<CarListScreen> {
                       ),
                       RangeSlider(
                         values: _modalPriceRange,
-                        min: 0, max: 10000000,
+                        min: 0,
+                        max: 10000000,
                         divisions: 20,
                         activeColor: const Color(0xFF1CE88A),
                         inactiveColor: Colors.grey[700],
-                        // SỬA LỖI: Xóa `const` khỏi RangeLabels
                         labels: RangeLabels(
-                          NumberFormat.compactSimpleCurrency(locale: 'vi-VN', decimalDigits: 0).format(_modalPriceRange.start),
-                          NumberFormat.compactSimpleCurrency(locale: 'vi-VN', decimalDigits: 0).format(_modalPriceRange.end),
+                          NumberFormat.compactSimpleCurrency(locale: 'vi-VN').format(_modalPriceRange.start),
+                          NumberFormat.compactSimpleCurrency(locale: 'vi-VN').format(_modalPriceRange.end),
                         ),
-                        onChanged: (values) {
-                          setModalState(() => _modalPriceRange = values);
-                        },
+                        onChanged: (values) => setModalState(() => _modalPriceRange = values),
                       ),
                     ],
                   ),
@@ -193,7 +181,7 @@ class _CarListScreenState extends State<CarListScreen> {
                             _currentPriceRange = const RangeValues(0, 5000000);
                             _searchController.clear();
                           });
-                          Provider.of<CarProvider>(context, listen: false).applyFilters();
+                          carProvider.applyFilters();
                           Navigator.pop(context);
                         },
                         child: const Text("Xóa bộ lọc", style: TextStyle(color: Colors.white)),
@@ -206,7 +194,7 @@ class _CarListScreenState extends State<CarListScreen> {
                             _selectedBranchId = _modalSelectedBranchId;
                             _currentPriceRange = _modalPriceRange;
                           });
-                          Provider.of<CarProvider>(context, listen: false).applyFilters(
+                          carProvider.applyFilters(
                             searchTerm: _searchController.text,
                             brandName: _selectedBrand,
                             categoryId: _selectedCategoryId,
@@ -237,8 +225,8 @@ class _CarListScreenState extends State<CarListScreen> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text(
-            _selectedBrand ?? "Thuê Xe",
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+          _selectedBrand ?? "Thuê Xe",
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.black,
         elevation: 0,
@@ -272,10 +260,7 @@ class _CarListScreenState extends State<CarListScreen> {
                     prefixIcon: const Icon(Icons.search, color: Colors.grey),
                     filled: true,
                     fillColor: Colors.grey[900],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30.0),
-                      borderSide: BorderSide.none,
-                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(30.0), borderSide: BorderSide.none),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   ),
                   onChanged: (value) {
@@ -292,7 +277,8 @@ class _CarListScreenState extends State<CarListScreen> {
               Expanded(
                 child: carProvider.filteredCars.isEmpty
                     ? RefreshIndicator(
-                  onRefresh: () => carProvider.fetchAllData().then((_){
+                  onRefresh: () async {
+                    await carProvider.fetchAllData();
                     carProvider.applyFilters(
                       searchTerm: _searchController.text,
                       brandName: _selectedBrand,
@@ -300,19 +286,19 @@ class _CarListScreenState extends State<CarListScreen> {
                       branchId: _selectedBranchId,
                       priceRange: _currentPriceRange,
                     );
-                  }),
+                  },
                   color: const Color(0xFF1CE88A),
-                  backgroundColor: Colors.grey[900],
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: const [
                       SizedBox(height: 150),
-                      Center(child: Text("Không tìm thấy xe phù hợp", style: TextStyle(color: Colors.grey))),
+                      Center(child: Text("Không tìm thấy xe phù hợp", style: TextStyle(color: Colors.grey, fontSize: 16))),
                     ],
                   ),
                 )
                     : RefreshIndicator(
-                  onRefresh: () => carProvider.fetchAllData().then((_){
+                  onRefresh: () async {
+                    await carProvider.fetchAllData();
                     carProvider.applyFilters(
                       searchTerm: _searchController.text,
                       brandName: _selectedBrand,
@@ -320,9 +306,8 @@ class _CarListScreenState extends State<CarListScreen> {
                       branchId: _selectedBranchId,
                       priceRange: _currentPriceRange,
                     );
-                  }),
+                  },
                   color: const Color(0xFF1CE88A),
-                  backgroundColor: Colors.grey[900],
                   child: GridView.builder(
                     padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -337,20 +322,21 @@ class _CarListScreenState extends State<CarListScreen> {
                       final priceFormat = NumberFormat.simpleCurrency(locale: 'vi-VN', decimalDigits: 0);
                       final imageUrl = car['mainImageUrl'];
                       final fullCarImageUrl = imageUrl != null ? "$baseUrl/images/$imageUrl" : null;
-                      final pricePerDay = double.tryParse(car['PRICE_PER_DAY']?.toString() ?? '0.0') ?? 0.0;
+                      final pricePerDay = double.tryParse(car['PRICE_PER_DAY']?.toString() ?? '0') ?? 0.0;
+
+                      // Lấy điểm đánh giá – nếu null thì mặc định 5.0
+                      final double rating = double.tryParse(car['RATING']?.toString() ?? '5.0') ?? 5.0;
 
                       return GestureDetector(
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (context) => CarDetailScreen(car: car),
-                            ),
+                            MaterialPageRoute(builder: (_) => CarDetailScreen(car: car)),
                           );
                         },
                         child: Card(
                           color: Colors.grey[900],
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                           clipBehavior: Clip.antiAlias,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,18 +344,19 @@ class _CarListScreenState extends State<CarListScreen> {
                               Expanded(
                                 child: SizedBox(
                                   width: double.infinity,
-                                  child: (fullCarImageUrl != null)
+                                  child: fullCarImageUrl != null
                                       ? Image.network(
                                     fullCarImageUrl,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) =>
-                                    const Center(child: Icon(Icons.broken_image_outlined, color: Colors.grey, size: 40)),
+                                    errorBuilder: (_, __, ___) => const Center(
+                                      child: Icon(Icons.broken_image_outlined, color: Colors.grey, size: 40),
+                                    ),
                                     loadingBuilder: (context, child, loadingProgress) {
                                       if (loadingProgress == null) return child;
-                                      return Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.grey[700]));
+                                      return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.grey));
                                     },
                                   )
-                                      : const Center(child: Icon(Icons.directions_car, color: Colors.grey, size: 40)),
+                                      : const Center(child: Icon(Icons.directions_car, color: Colors.grey, size: 50)),
                                 ),
                               ),
                               Padding(
@@ -378,15 +365,30 @@ class _CarListScreenState extends State<CarListScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      "${car['BRAND'] ?? ''} ${car['MODEL'] ?? ''}",
+                                      "${car['BRAND'] ?? ''} ${car['MODEL'] ?? ''}".trim(),
                                       style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      priceFormat.format(pricePerDay) + '/ngày',
-                                      style: const TextStyle(color: Color(0xFF1CE88A), fontSize: 13, fontWeight: FontWeight.w500),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          "${priceFormat.format(pricePerDay)}/ngày",
+                                          style: const TextStyle(color: Color(0xFF1CE88A), fontSize: 12, fontWeight: FontWeight.w600),
+                                        ),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.star, color: Colors.amber, size: 15),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              rating.toStringAsFixed(1),
+                                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),

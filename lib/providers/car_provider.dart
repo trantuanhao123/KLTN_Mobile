@@ -1,4 +1,3 @@
-// lib/providers/car_provider.dart
 import 'package:flutter/material.dart';
 import 'package:mobile/api/api_service.dart';
 
@@ -12,7 +11,6 @@ class CarProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
-  // Lấy dữ liệu thô để filter ở frontend
   List<dynamic> get allCars => _allCars;
   List<dynamic> get filteredCars => _filteredCars;
   List<dynamic> get categories => _categories;
@@ -21,7 +19,7 @@ class CarProvider with ChangeNotifier {
   String? get error => _error;
 
   CarProvider() {
-    fetchAllData();
+    // fetchAllData();
   }
 
   Future<void> fetchAllData() async {
@@ -34,30 +32,36 @@ class CarProvider with ChangeNotifier {
         _apiService.getCategories(),
         _apiService.getBranches(),
       ]);
-      _allCars = results[0];
+
+      // Xử lý chuẩn hóa dữ liệu xe trước khi lưu
+      _allCars = results[0].map((car) {
+        // Backend trả về 'mainImageUrl', ta map nó sang 'image' hoặc 'thumbnail' để UI dùng
+        car['image'] = car['mainImageUrl'] ?? car['IMAGE_URL'] ?? '';
+        car['thumbnail'] = car['mainImageUrl'] ?? '';
+        return car;
+      }).toList();
+
       _categories = results[1];
       _branches = results[2];
-      _filteredCars = List.from(_allCars); // Khởi tạo ban đầu
+      _filteredCars = List.from(_allCars);
     } catch (e) {
       _error = "Lỗi tải dữ liệu: ${e.toString()}";
-      print(_error); // In lỗi ra console để debug
+      print(_error);
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Hàm áp dụng bộ lọc
   void applyFilters({
     String? searchTerm,
-    String? brandName, // Bộ lọc theo tên thương hiệu
+    String? brandName,
     int? categoryId,
     int? branchId,
     RangeValues? priceRange,
   }) {
     List<dynamic> tempCars = List.from(_allCars);
 
-    // Lọc theo searchTerm (tìm kiếm trong tên, hãng, model, biển số)
     if (searchTerm != null && searchTerm.isNotEmpty) {
       final lowerCaseSearch = searchTerm.toLowerCase();
       tempCars = tempCars.where((car) {
@@ -70,38 +74,33 @@ class CarProvider with ChangeNotifier {
       }).toList();
     }
 
-    // Lọc theo brandName (nếu được cung cấp)
     if (brandName != null && brandName.isNotEmpty) {
       final lowerCaseBrand = brandName.toLowerCase();
       tempCars = tempCars.where((car) {
         final brand = (car['BRAND'] as String?)?.toLowerCase() ?? '';
-        return brand == lowerCaseBrand; // So sánh chính xác tên thương hiệu
+        return brand == lowerCaseBrand;
       }).toList();
-      // Ghi chú: Có thể bạn muốn reset các filter khác khi lọc theo brand từ trang chủ
-      // categoryId = null;
-      // branchId = null;
-      // priceRange = null;
     }
 
-    // Lọc theo categoryId
     if (categoryId != null) {
+      // Backend trả về CATEGORY_ID (viết hoa)
       tempCars = tempCars.where((car) => car['CATEGORY_ID'] == categoryId).toList();
     }
 
-    // Lọc theo branchId
     if (branchId != null) {
+      // Backend trả về BRANCH_ID (viết hoa)
       tempCars = tempCars.where((car) => car['BRANCH_ID'] == branchId).toList();
     }
 
-    // Lọc theo khoảng giá
     if (priceRange != null) {
       tempCars = tempCars.where((car) {
+        // Backend trả về PRICE_PER_DAY, ép kiểu an toàn
         final price = double.tryParse(car['PRICE_PER_DAY'].toString()) ?? 0.0;
         return price >= priceRange.start && price <= priceRange.end;
       }).toList();
     }
 
     _filteredCars = tempCars;
-    notifyListeners(); // Thông báo cho các widget đang lắng nghe về sự thay đổi
+    notifyListeners();
   }
 }
