@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile/api/api_service.dart';
-// import 'package:mobile/providers/auth_provider.dart'; // Có thể bỏ nếu không dùng trực tiếp
-// import 'package:provider/provider.dart';
 
 class MyBookingScreen extends StatefulWidget {
   const MyBookingScreen({super.key});
@@ -15,7 +13,6 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
   late Future<List<dynamic>> _bookingsFuture;
   final ApiService apiService = ApiService();
 
-  // Controller cho form nhập thông tin hoàn tiền
   final _bankAccountController = TextEditingController();
   final _bankNameController = TextEditingController();
   final _refundFormKey = GlobalKey<FormState>();
@@ -33,15 +30,61 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
     super.dispose();
   }
 
-  /// Tải (hoặc tải lại) danh sách đơn hàng
+  /// [SỬA ĐỔI QUAN TRỌNG]: Hàm này thực hiện "Client-side Join"
+  /// Nó gọi 2 API cùng lúc: lấy đơn hàng và lấy tất cả xe
+  /// Sau đó tự ghép thông tin xe vào đơn hàng dựa trên CAR_ID
+  Future<List<dynamic>> _fetchBookingsWithCarDetails() async {
+    try {
+      // 1. Gọi song song 2 API
+      final results = await Future.wait([
+        apiService.getUserBookings(), // Index 0: Danh sách đơn (đang thiếu info xe)
+        apiService.getCars(),         // Index 1: Danh sách tất cả xe (đầy đủ info)
+      ]);
+
+      final bookings = results[0] as List<dynamic>;
+      final cars = results[1] as List<dynamic>;
+
+      // 2. Tạo Map cho danh sách xe để tra cứu nhanh (Key: CAR_ID)
+      final Map<int, dynamic> carMap = {
+        for (var c in cars) c['CAR_ID']: c
+      };
+
+      // 3. Duyệt qua từng đơn hàng và ghép thông tin xe vào
+      for (var booking in bookings) {
+        final carId = booking['CAR_ID'];
+        // Nếu tìm thấy xe trong danh sách xe tải về, gán vào biến 'Car'
+        if (carId != null && carMap.containsKey(carId)) {
+          var carInfo = carMap[carId];
+
+          // Chuẩn hóa dữ liệu ảnh (vì API getCars có thể trả về cấu trúc hơi khác)
+          // Đảm bảo trường mainImageUrl tồn tại để UI sử dụng
+          carInfo['mainImageUrl'] = carInfo['mainImageUrl'] ?? carInfo['IMAGE_URL'] ?? carInfo['imageUrl'];
+
+          booking['Car'] = carInfo;
+        } else {
+          // Trường hợp xe đã bị xóa hoặc không tìm thấy, tạo object rỗng để tránh lỗi
+          booking['Car'] = {};
+        }
+      }
+
+      return bookings;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   void _loadBookings() {
     setState(() {
-      _bookingsFuture = apiService.getUserBookings();
+      // Gọi hàm mới thay vì gọi trực tiếp apiService.getUserBookings()
+      _bookingsFuture = _fetchBookingsWithCarDetails();
     });
   }
 
+  // ... [GIỮ NGUYÊN CÁC HÀM LOGIC KHÁC KHÔNG THAY ĐỔI] ...
+  // (Phần Review, Hủy đơn, Đổi lịch... giữ nguyên như cũ)
+
   // =======================================================================
-  // [MỚI] LOGIC ĐÁNH GIÁ (REVIEW)
+  // PHẦN LOGIC ĐÁNH GIÁ (REVIEW)
   // =======================================================================
   void _showReviewDialog(int orderId) {
     final contentController = TextEditingController();
@@ -59,7 +102,6 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
               children: [
                 const Text('Bạn cảm thấy thế nào về chiếc xe này?', style: TextStyle(color: Colors.grey)),
                 const SizedBox(height: 20),
-                // 5 ngôi sao
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(5, (index) {
@@ -101,7 +143,7 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1CE88A)),
               onPressed: () async {
-                Navigator.pop(context); // Đóng dialog
+                Navigator.pop(context);
                 _handleSubmitReview(orderId, selectedRating.toInt(), contentController.text);
               },
               child: const Text('Gửi đánh giá', style: TextStyle(color: Colors.black)),
@@ -117,19 +159,17 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
     try {
       await apiService.submitReview(orderId, rating, content);
       if (!mounted) return;
-      Navigator.of(context).pop(); // Tắt loading
+      Navigator.of(context).pop();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Đánh giá thành công!'), backgroundColor: Colors.green),
       );
-      _loadBookings(); // Tải lại danh sách để cập nhật nút
+      _loadBookings();
     } catch (e) {
       _handleApiError(e);
     }
   }
-  // =======================================================================
 
-  /// Xử lý khi nhấn nút Hủy Đơn (LOGIC CŨ GIỮ NGUYÊN)
   Future<void> _handleCancelBooking(Map<String, dynamic> booking) async {
     final int orderId = booking['ORDER_ID'];
     final String status = booking['STATUS'] ?? 'UNKNOWN';
@@ -141,14 +181,11 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
 
     if (status.toUpperCase() == 'PENDING_PAYMENT' && paymentStatus == 'unpaid') {
       apiStatusToCall = 'PENDING';
-    }
-    else if (status.toUpperCase() == 'CONFIRMED' && paymentStatus == 'partial') {
+    } else if (status.toUpperCase() == 'CONFIRMED' && paymentStatus == 'partial') {
       apiStatusToCall = 'PAID_DEPOSIT';
-    }
-    else if (status.toUpperCase() == 'CONFIRMED' && paymentStatus == 'paid') {
+    } else if (status.toUpperCase() == 'CONFIRMED' && paymentStatus == 'paid') {
       apiStatusToCall = 'PAID_FULL';
-    }
-    else {
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Không thể hủy đơn hàng ở trạng thái này (S:$status / PS:$paymentStatus).'),
@@ -158,7 +195,6 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
       return;
     }
 
-    // Form nhập hoàn tiền (GIỮ NGUYÊN)
     if (apiStatusToCall == 'PAID_FULL') {
       final refundInfoConfirmed = await showDialog<bool>(
         context: context,
@@ -232,14 +268,12 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
       );
 
       if (refundInfoConfirmed != true) return;
-
       bankAccount = _bankAccountController.text.trim();
       bankName = _bankNameController.text.trim();
       _bankAccountController.clear();
       _bankNameController.clear();
     }
 
-    // Xác nhận hủy (GIỮ NGUYÊN)
     final bool? confirmedCancel = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -288,8 +322,6 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
     }
   }
 
-  // --- CÁC HÀM CHỌN NGÀY GIỜ (GIỮ NGUYÊN) ---
-
   Future<Map<String, String>?> _selectNewDayModeDateRange(DateTime currentStartDate) async {
     final now = DateTime.now();
     final firstSelectableDate = now.isBefore(currentStartDate) ? currentStartDate : now;
@@ -319,12 +351,9 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
     );
 
     if (picked == null) return null;
-
     final startDateFormatted = DateFormat('yyyy-MM-dd HH:mm:ss').format(picked.start);
     final endDateFormatted = DateFormat('yyyy-MM-dd HH:mm:ss').format(
-        DateTime(picked.end.year, picked.end.month, picked.end.day, 23, 59, 59)
-    );
-
+        DateTime(picked.end.year, picked.end.month, picked.end.day, 23, 59, 59));
     return {'startDate': startDateFormatted, 'endDate': endDateFormatted};
   }
 
@@ -415,7 +444,6 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
 
   Future<void> _handleChangeDate(int orderId, DateTime currentStartDate, String rentalType) async {
     Map<String, String>? newDates;
-
     if (rentalType == 'hour') {
       newDates = await _selectNewHourModeDateTime(currentStartDate);
     } else {
@@ -423,7 +451,6 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
     }
 
     if (newDates == null) return;
-
     final String newStartDateFormatted = newDates['startDate']!;
     final String newEndDateFormatted = newDates['endDate']!;
 
@@ -584,7 +611,6 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
       final String? imageUrl = car['mainImageUrl'];
       String? fullCarImageUrl;
       if (imageUrl != null) {
-        // Logic kiểm tra URL
         fullCarImageUrl = imageUrl.startsWith('http') ? imageUrl : "${apiService.baseUrl}/images/$imageUrl";
       }
 
@@ -615,11 +641,8 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
       }
 
       final bool isFuture = DateTime.now().isBefore(startDate);
-
       bool canCancel = (status == 'PENDING_PAYMENT' || status == 'CONFIRMED') && isFuture;
       bool canChangeDate = (status == 'CONFIRMED') && isFuture;
-
-      // [MỚI] Kiểm tra logic review
       final bool hasReviewed = booking['review'] != null;
       final bool canReview = (status == 'COMPLETED') && !hasReviewed;
 
@@ -633,7 +656,6 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Thông tin xe
               Row(
                 children: [
                   Container(
@@ -670,13 +692,11 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
               ),
               const Divider(color: Colors.white24, height: 24),
 
-              // 2. Thông tin chi tiết
               _buildInfoRow(Icons.calendar_today, 'Nhận xe:', dateFormat.format(startDate)),
               _buildInfoRow(Icons.calendar_today, 'Trả xe:', dateFormat.format(endDate)),
               _buildInfoRow(Icons.money, 'Tổng tiền:', priceFormat.format(finalAmount)),
               _buildInfoRow(Icons.access_time, 'Loại thuê:', rentalType == 'hour' ? 'Theo giờ' : 'Theo ngày'),
 
-              // 3. Trạng thái
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -686,21 +706,17 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
                 ],
               ),
 
-              // 4. Dãy nút hành động (ĐÃ UPDATE THÊM REVIEW)
               if (canCancel || canChangeDate || canReview)
                 Padding(
                   padding: const EdgeInsets.only(top: 16.0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      // Nút Đổi lịch (Logic cũ)
                       if (canChangeDate)
                         TextButton(
                           onPressed: () => _handleChangeDate(booking['ORDER_ID'], startDate, rentalType),
                           child: const Text('Đổi lịch', style: TextStyle(color: Color(0xFF1CE88A))),
                         ),
-
-                      // [MỚI] Nút Đánh giá
                       if (canReview)
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
@@ -712,10 +728,7 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
                           label: const Text('Đánh giá', style: TextStyle(color: Colors.white, fontSize: 13)),
                           onPressed: () => _showReviewDialog(booking['ORDER_ID']),
                         ),
-
                       const SizedBox(width: 8),
-
-                      // Nút Hủy chuyến (Logic cũ)
                       if (canCancel)
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
@@ -729,8 +742,6 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
                     ],
                   ),
                 ),
-
-              // [MỚI] Nếu đã đánh giá rồi, hiện thông báo nhỏ
               if (status == 'COMPLETED' && hasReviewed)
                 Padding(
                   padding: const EdgeInsets.only(top: 12.0),

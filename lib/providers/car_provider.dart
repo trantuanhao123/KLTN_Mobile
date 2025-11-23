@@ -33,11 +33,11 @@ class CarProvider with ChangeNotifier {
         _apiService.getBranches(),
       ]);
 
-      // Xử lý chuẩn hóa dữ liệu xe trước khi lưu
+      // Xử lý chuẩn hóa dữ liệu xe
       _allCars = results[0].map((car) {
-        // Backend trả về 'mainImageUrl', ta map nó sang 'image' hoặc 'thumbnail' để UI dùng
-        car['image'] = car['mainImageUrl'] ?? car['IMAGE_URL'] ?? '';
-        car['thumbnail'] = car['mainImageUrl'] ?? '';
+        // Backend có thể trả về 'mainImageUrl', 'IMAGE_URL' hoặc 'imageUrl'
+        car['image'] = car['mainImageUrl'] ?? car['IMAGE_URL'] ?? car['imageUrl'] ?? '';
+        car['thumbnail'] = car['mainImageUrl'] ?? car['imageUrl'] ?? '';
         return car;
       }).toList();
 
@@ -53,6 +53,11 @@ class CarProvider with ChangeNotifier {
     }
   }
 
+  // Helper để lấy giá trị từ key thường hoặc key hoa
+  dynamic _getValue(Map<dynamic, dynamic> map, String key) {
+    return map[key] ?? map[key.toUpperCase()] ?? map[key.toLowerCase()];
+  }
+
   void applyFilters({
     String? searchTerm,
     String? brandName,
@@ -65,9 +70,9 @@ class CarProvider with ChangeNotifier {
     if (searchTerm != null && searchTerm.isNotEmpty) {
       final lowerCaseSearch = searchTerm.toLowerCase();
       tempCars = tempCars.where((car) {
-        final brand = (car['BRAND'] as String?)?.toLowerCase() ?? '';
-        final model = (car['MODEL'] as String?)?.toLowerCase() ?? '';
-        final licensePlate = (car['LICENSE_PLATE'] as String?)?.toLowerCase() ?? '';
+        final brand = (_getValue(car, 'brand') as String?)?.toLowerCase() ?? '';
+        final model = (_getValue(car, 'model') as String?)?.toLowerCase() ?? '';
+        final licensePlate = (_getValue(car, 'license_plate') as String?)?.toLowerCase() ?? ''; // licensePlate hoặc LICENSE_PLATE
         return brand.contains(lowerCaseSearch) ||
             model.contains(lowerCaseSearch) ||
             licensePlate.contains(lowerCaseSearch);
@@ -77,25 +82,30 @@ class CarProvider with ChangeNotifier {
     if (brandName != null && brandName.isNotEmpty) {
       final lowerCaseBrand = brandName.toLowerCase();
       tempCars = tempCars.where((car) {
-        final brand = (car['BRAND'] as String?)?.toLowerCase() ?? '';
+        final brand = (_getValue(car, 'brand') as String?)?.toLowerCase() ?? '';
         return brand == lowerCaseBrand;
       }).toList();
     }
 
     if (categoryId != null) {
-      // Backend trả về CATEGORY_ID (viết hoa)
-      tempCars = tempCars.where((car) => car['CATEGORY_ID'] == categoryId).toList();
+      // Dùng _getValue để tìm cả 'categoryId' hoặc 'CATEGORY_ID'
+      tempCars = tempCars.where((car) {
+        final cId = _getValue(car, 'category_id');
+        return cId == categoryId;
+      }).toList();
     }
 
     if (branchId != null) {
-      // Backend trả về BRANCH_ID (viết hoa)
-      tempCars = tempCars.where((car) => car['BRANCH_ID'] == branchId).toList();
+      tempCars = tempCars.where((car) {
+        final bId = _getValue(car, 'branch_id');
+        return bId == branchId;
+      }).toList();
     }
 
     if (priceRange != null) {
       tempCars = tempCars.where((car) {
-        // Backend trả về PRICE_PER_DAY, ép kiểu an toàn
-        final price = double.tryParse(car['PRICE_PER_DAY'].toString()) ?? 0.0;
+        final priceVal = _getValue(car, 'price_per_day') ?? _getValue(car, 'pricePerDay');
+        final price = double.tryParse(priceVal.toString()) ?? 0.0;
         return price >= priceRange.start && price <= priceRange.end;
       }).toList();
     }

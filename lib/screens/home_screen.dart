@@ -1,10 +1,8 @@
-// lib/screens/home_screen.dart
-import 'dart:async'; // Để dùng Timer
-import 'dart:io';    // Để check Platform
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // Import thư viện thông báo
-
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:mobile/providers/user_provider.dart';
 import 'package:mobile/providers/home_provider.dart';
 import 'package:mobile/providers/car_provider.dart';
@@ -56,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _checkNewNotifications() async {
     try {
       final apiService = ApiService();
-      // Gọi API lấy danh sách thông báo (đảm bảo bạn đã thêm hàm getNotifications vào api_service.dart)
+      // Gọi API lấy danh sách thông báo
       final notifications = await apiService.getNotifications();
 
       if (notifications.isNotEmpty) {
@@ -67,7 +65,6 @@ class _HomeScreenState extends State<HomeScreen> {
         final newestId = newest['NOTIFICATION_ID'] as int;
 
         // Nếu ID mới nhận được > ID đã lưu => Có thông báo mới
-        // (_lastNotificationId != 0 để tránh hiện thông báo ngay khi vừa mở app, chỉ hiện cái mới đến sau đó)
         if (_lastNotificationId != 0 && newestId > _lastNotificationId) {
           // HIỆN THÔNG BÁO "TING TING"
           LocalNotificationHelper.showNotification(
@@ -81,7 +78,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _lastNotificationId = newestId;
       }
     } catch (e) {
-      // Lỗi mạng hoặc lỗi API thì bỏ qua, không làm phiền user
       debugPrint("Lỗi polling notification: $e");
     }
   }
@@ -130,7 +126,6 @@ class _HomeScreenState extends State<HomeScreen> {
             actions: [
               IconButton(
                 onPressed: () {
-                  // Chuyển sang màn hình danh sách thông báo
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => const NotificationScreen()),
@@ -180,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- CÁC WIDGET UI CŨ (Giữ nguyên logic hiển thị của bạn) ---
+  // --- CÁC WIDGET UI ---
 
   Widget _buildSectionHeader(BuildContext context, String title, VoidCallback onViewAll) {
     return Padding(
@@ -238,22 +233,50 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildBrandsSection(BuildContext context, List<String> brands) {
     if (brands.isEmpty) return const SizedBox.shrink();
+
     return SizedBox(
-      height: 80,
+      height: 90,
       child: ListView.builder(
-        scrollDirection: Axis.horizontal, itemCount: brands.length, padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        scrollDirection: Axis.horizontal,
+        itemCount: brands.length,
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
         itemBuilder: (context, index) {
           final brandName = brands[index];
+          final firstLetter = brandName.isNotEmpty ? brandName[0].toUpperCase() : '?';
+
           return Padding(
             padding: const EdgeInsets.only(right: 20.0),
             child: GestureDetector(
-              onTap: () { Navigator.push(context, MaterialPageRoute(builder: (context) => CarListScreen(initialBrandFilter: brandName))); },
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => CarListScreen(initialBrandFilter: brandName)));
+              },
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircleAvatar(radius: 25, backgroundColor: Colors.grey[900], child: const Icon(Icons.directions_car_filled, color: Colors.white70, size: 22)),
+                  // Ô tròn chứa chữ cái
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800], // Màu nền xám
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.grey.shade700, width: 1),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      firstLetter,
+                      style: const TextStyle(
+                        color: Color(0xFF1CE88A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 22,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  Text(brandName, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  Text(
+                      brandName,
+                      style: const TextStyle(color: Colors.white70, fontSize: 12)
+                  ),
                 ],
               ),
             ),
@@ -295,20 +318,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// =============================================================================
-// [MỚI] Helper Class để xử lý hiển thị thông báo (Nằm ngay trong file này)
-// =============================================================================
 class LocalNotificationHelper {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
   FlutterLocalNotificationsPlugin();
 
   // Khởi tạo (Gọi ở initState)
   static Future<void> initialize() async {
-    // Cài đặt icon cho Android (mặc định @mipmap/ic_launcher)
     const AndroidInitializationSettings initializationSettingsAndroid =
     AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    // Cài đặt cho iOS (đơn giản)
     const DarwinInitializationSettings initializationSettingsDarwin =
     DarwinInitializationSettings();
 
@@ -319,7 +337,6 @@ class LocalNotificationHelper {
 
     await _notificationsPlugin.initialize(initializationSettings);
 
-    // Xin quyền hiển thị thông báo (Android 13+)
     if (Platform.isAndroid) {
       await _notificationsPlugin
           .resolvePlatformSpecificImplementation<

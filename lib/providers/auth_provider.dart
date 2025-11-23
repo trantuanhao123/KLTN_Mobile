@@ -15,46 +15,54 @@ class AuthProvider with ChangeNotifier {
   Future<void> _checkToken() async {
     String? token = await _apiService.getToken();
     if (token != null) {
-      // Có thể thêm bước gọi API /profile để xác thực token thực sự còn hiệu lực
-      // Nếu API /profile trả lỗi 401/403 thì gọi _apiService.deleteToken()
       try {
         await _apiService.getUserProfile(); // Thử gọi API cần token
         _isAuthenticated = true;
       } catch (e) {
-        // Nếu lỗi do token không hợp lệ (ví dụ Exception chứa 'Phiên đăng nhập hết hạn')
         if (e.toString().contains('Phiên đăng nhập hết hạn')) {
-          await _apiService.deleteToken(); // Xóa token cũ
+          await _apiService.deleteToken();
         }
-        _isAuthenticated = false; // Đặt là false nếu token không hợp lệ
+        _isAuthenticated = false;
         print("Lỗi kiểm tra token: $e");
       } finally {
         notifyListeners();
       }
-
     } else {
       _isAuthenticated = false;
       notifyListeners();
     }
   }
 
-
   Future<void> login(String email, String password) async {
-    // Hàm login trong ApiService đã tự động lưu token nếu thành công
     await _apiService.login(email, password);
     _isAuthenticated = true;
     notifyListeners();
   }
 
   Future<void> logout() async {
-    await _apiService.logout(); // Chỉ xóa token local
+    await _apiService.logout();
     _isAuthenticated = false;
     notifyListeners();
   }
 
-  /// Dùng sau khi xác thực OTP đăng ký thành công (ApiService đã lưu token)
-  /// Hàm này chỉ cập nhật trạng thái UI, không gọi API login lại.
   void forceLogin() {
     _isAuthenticated = true;
     notifyListeners();
+  }
+
+  // --- [BỔ SUNG HÀM NÀY ĐỂ SỬA LỖI] ---
+  Future<void> loginWithGoogle(String idToken) async {
+    try {
+      // Gọi API Service để gửi token lên Backend
+      await _apiService.loginWithGoogle(idToken);
+
+      // Nếu thành công, set trạng thái đăng nhập = true
+      _isAuthenticated = true;
+      notifyListeners();
+    } catch (e) {
+      _isAuthenticated = false;
+      notifyListeners();
+      rethrow; // Ném lỗi ra để LoginScreen hiển thị thông báo
+    }
   }
 }

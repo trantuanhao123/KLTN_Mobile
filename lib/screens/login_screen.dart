@@ -1,10 +1,11 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mobile/providers/auth_provider.dart';
 import 'package:mobile/screens/signup_screen.dart';
 import 'package:mobile/screens/forgot_password_screen.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:mobile/screens/main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,13 +20,19 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _isPasswordVisible = false;
 
+  // CẤU HÌNH GOOGLE SIGN IN
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: 'ClientId.apps.googleusercontent.com',
+    scopes: ['email', 'profile'],
+  );
+
   @override
   void initState() {
     super.initState();
-    _emailController.text = "test@example.com";
-    _passwordController.text = "123456";
+    // Không gán text mặc định ở đây nữa để tránh phải xóa thủ công
   }
 
+  // Đăng nhập bằng email/password
   Future<void> _login() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
@@ -35,13 +42,60 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await authProvider.login(
-        _emailController.text,
+        _emailController.text.trim(),
         _passwordController.text,
+      );
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainScreen()),
       );
     } catch (e) {
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text('Lỗi: ${e.toString().replaceFirst("Exception: ", "")}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // Đăng nhập Google
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final String? idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        throw Exception('Không lấy được ID Token từ Google');
+      }
+
+      await Provider.of<AuthProvider>(context, listen: false).loginWithGoogle(idToken);
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi đăng nhập Google: ${e.toString().replaceAll("Exception: ", "")}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -77,40 +131,42 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Đăng nhập & trải nghiệm trọn vẹn.',
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 16,
-                ),
+                'Đăng nhập để trải nghiệm trọn vẹn.',
+                style: TextStyle(color: Colors.grey[400], fontSize: 16),
               ),
               const SizedBox(height: 48),
+
+              // Email field (Thêm hintText)
               _buildTextField(
                 controller: _emailController,
                 label: 'Email',
+                hintText: 'NguyenVanA@gmail.com',
                 keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 24),
+
+              // Password field (Thêm hintText)
               _buildTextField(
                 controller: _passwordController,
                 label: 'Mật khẩu',
+                hintText: '',
                 isPassword: true,
               ),
               const SizedBox(height: 16),
+
+              // Quên mật khẩu
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
-                    );
-                  },
-                  child: const Text(
-                    'Quên mật khẩu?',
-                    style: TextStyle(color: Colors.white),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
                   ),
+                  child: const Text('Quên mật khẩu?', style: TextStyle(color: Colors.white)),
                 ),
               ),
               const SizedBox(height: 24),
+
+              // Nút đăng nhập
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -118,30 +174,23 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1CE88A),
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                   ),
                   child: _isLoading
                       ? const SizedBox(
                     width: 24,
                     height: 24,
-                    child: CircularProgressIndicator(
-                      color: Colors.black,
-                      strokeWidth: 3,
-                    ),
+                    child: CircularProgressIndicator(color: Colors.black, strokeWidth: 3),
                   )
                       : const Text(
                     'Đăng nhập',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
               const SizedBox(height: 32),
+
+              // Divider
               Row(
                 children: [
                   Expanded(child: Divider(color: Colors.grey[800])),
@@ -153,18 +202,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ),
               const SizedBox(height: 32),
-              _buildSocialButton(
-                icon: Image.asset('assets/google_logo.png', height: 24),
-                text: 'Đăng nhập với Google',
-                onPressed: () {},
-              ),
-              const SizedBox(height: 16),
-              _buildSocialButton(
-                icon: const FaIcon(FontAwesomeIcons.facebook, color: Color(0xFF1877F2), size: 28),
-                text: 'Đăng nhập với Facebook',
-                onPressed: () {},
+
+              // Nút Google
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton.icon(
+                  icon: Image.asset('assets/google_logo.png', height: 24),
+                  label: const Text(
+                    'Đăng nhập bằng Google',
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Colors.grey[800]!),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  ),
+                  onPressed: _isLoading ? null : _handleGoogleSignIn,
+                ),
               ),
               const SizedBox(height: 48),
+
+              // Đăng ký
               Align(
                 alignment: Alignment.center,
                 child: RichText(
@@ -174,15 +232,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       TextSpan(
                         text: 'Đăng ký',
-                        style: const TextStyle(
-                          color: Color(0xFF1CE88A),
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: const TextStyle(color: Color(0xFF1CE88A), fontWeight: FontWeight.bold),
                         recognizer: TapGestureRecognizer()
                           ..onTap = () {
-                            // Điều hướng đến màn hình Đăng ký
                             Navigator.of(context).push(
-                              MaterialPageRoute(builder: (context) => const SignupScreen()),
+                              MaterialPageRoute(builder: (_) => const SignupScreen()),
                             );
                           },
                       ),
@@ -190,7 +244,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24), // Thêm khoảng trống ở cuối
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -198,9 +252,11 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // Helper xây TextField với hintText
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
+    String? hintText, // <--- Thêm tham số này
     bool isPassword = false,
     TextInputType keyboardType = TextInputType.text,
   }) {
@@ -215,6 +271,10 @@ class _LoginScreenState extends State<LoginScreen> {
           obscureText: isPassword && !_isPasswordVisible,
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
+            // Cấu hình Placeholder ở đây
+            hintText: hintText,
+            hintStyle: TextStyle(color: Colors.grey[600]), // Màu chữ mờ
+
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -230,46 +290,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
                 color: Colors.grey,
               ),
-              onPressed: () {
-                setState(() {
-                  _isPasswordVisible = !_isPasswordVisible;
-                });
-              },
+              onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
             )
                 : null,
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildSocialButton({
-    required Widget icon,
-    required String text,
-    required VoidCallback onPressed,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.grey[900],
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-            side: BorderSide(color: Colors.grey[800]!),
-          ),
-        ),
-        icon: icon,
-        label: Text(
-          text,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
     );
   }
 }

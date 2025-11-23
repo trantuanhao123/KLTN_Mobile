@@ -7,6 +7,7 @@ import 'package:http_parser/http_parser.dart';
 class ApiService {
   // Thay đổi IP này thành IP máy tính của bạn
   // Nếu dùng Emulator Android → dùng http://10.0.2.2:8080
+  // Nếu dùng máy thật -> dùng IP LAN (ví dụ 192.168.1.x)
   static const String _baseUrl = "http://192.168.1.9:8080";
   static const int _timeoutSeconds = 30;
 
@@ -85,7 +86,6 @@ class ApiService {
           await _saveToken(data['token']);
           print('--- LOGIN SUCCESS TOKEN ---');
           print(data['token']);
-          print('--- END LOGIN SUCCESS TOKEN ---');
         }
         return data;
       } else {
@@ -163,7 +163,7 @@ class ApiService {
 
   Future<void> logout() async => await deleteToken();
 
-  // ====================== PROFILE ======================
+  // ====================== PROFILE & USER ======================
 
   Future<Map<String, dynamic>> getUserProfile() async {
     try {
@@ -218,9 +218,7 @@ class ApiService {
       final streamedResponse = await request.send().timeout(Duration(seconds: _timeoutSeconds));
       final response = await http.Response.fromStream(streamedResponse);
 
-      if (response.statusCode == 401 || response.statusCode == 403) {
-        throw Exception('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
-      }
+      _handleAuthError(response);
       if (response.statusCode != 200) {
         final error = _safeJsonDecode(response.body);
         throw Exception(error['error'] ?? 'Tải ảnh lên thất bại');
@@ -230,7 +228,63 @@ class ApiService {
     }
   }
 
-  // ====================== CÁC HÀM GET ĐÃ ĐƯỢC CẬP NHẬT (CÓ TOKEN) ======================
+  /// Hàm mới: Cập nhật bằng lái xe (Mặt trước + Mặt sau)
+  Future<void> updateLicense(String userId, String frontPath, String backPath) async {
+    if (userId.isEmpty || frontPath.isEmpty || backPath.isEmpty) throw Exception('Dữ liệu không hợp lệ');
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/user/editLicense/$userId'));
+
+      final mimeFront = lookupMimeType(frontPath)?.split('/');
+      request.files.add(await http.MultipartFile.fromPath(
+        'license_front', // Phải khớp với config multer trong routes/userRoutes.js
+        frontPath,
+        contentType: mimeFront != null ? MediaType(mimeFront[0], mimeFront[1]) : null,
+      ));
+
+      final mimeBack = lookupMimeType(backPath)?.split('/');
+      request.files.add(await http.MultipartFile.fromPath(
+        'license_back', // Phải khớp với config multer trong routes/userRoutes.js
+        backPath,
+        contentType: mimeBack != null ? MediaType(mimeBack[0], mimeBack[1]) : null,
+      ));
+
+      final token = await getToken();
+      if (token == null) throw Exception('Chưa đăng nhập');
+      request.headers['Authorization'] = 'Bearer $token';
+
+      final streamedResponse = await request.send().timeout(Duration(seconds: _timeoutSeconds));
+      final response = await http.Response.fromStream(streamedResponse);
+
+      _handleAuthError(response);
+      if (response.statusCode != 200) {
+        final error = _safeJsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Cập nhật bằng lái thất bại');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Hàm mới: Đổi mật khẩu
+  Future<void> changePassword(String oldPassword, String newPassword) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/user/change-password'),
+        headers: await _getHeaders(hasBody: true),
+        body: jsonEncode({'oldPassword': oldPassword, 'newPassword': newPassword}),
+      ).timeout(Duration(seconds: _timeoutSeconds));
+
+      _handleAuthError(response);
+      if (response.statusCode != 200) {
+        final error = _safeJsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Đổi mật khẩu thất bại');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // ====================== CAR & DATA ======================
 
   Future<List<Map<String, dynamic>>> getBanners() async {
     try {
@@ -252,6 +306,7 @@ class ApiService {
   Future<List<Map<String, dynamic>>> getCars() async {
     try {
       final headers = await _getHeaders();
+      // Nếu muốn lấy chỉ xe khả dụng cho user, hãy đổi thành: '$baseUrl/car/available'
       final response = await http
           .get(Uri.parse('$baseUrl/car'), headers: headers)
           .timeout(Duration(seconds: _timeoutSeconds));
@@ -291,7 +346,7 @@ class ApiService {
     }
   }
 
-  // ====================== CÁC HÀM KHÁC (GIỮ NGUYÊN) ======================
+  // ====================== PASSWORD RESET ======================
 
   Future<void> requestPasswordReset(String email) async {
     if (!_isValidEmail(email)) throw Exception('Email không hợp lệ');
@@ -334,6 +389,8 @@ class ApiService {
       throw Exception('Lỗi kết nối: ${e.toString()}');
     }
   }
+
+  // ====================== ORDERS & BOOKING ======================
 
   Future<String> createOrderAndGetPaymentLink({
     required int carId,
@@ -409,7 +466,7 @@ class ApiService {
     } else if (status == 'PAID_DEPOSIT') {
       endpoint = '$baseUrl/order/cancel-deposit/$orderId';
     } else if (status == 'PAID_FULL') {
-      endpoint = '$baseUrl/order/cancel-paid/$orderId'; // Sửa lỗi typo "annull-paid"
+      endpoint = '$baseUrl/order/cancel-paid/$orderId';
       if (bankAccount?.trim().isEmpty != false || bankName?.trim().isEmpty != false) {
         throw Exception('Vui lòng cung cấp Số tài khoản và Tên ngân hàng để hoàn tiền.');
       }
@@ -451,6 +508,7 @@ class ApiService {
       rethrow;
     }
   }
+
   Future<void> submitReview(int orderId, int rating, String content) async {
     try {
       final response = await http.post(
@@ -464,7 +522,7 @@ class ApiService {
       ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return; // Thành công
+        return;
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['error'] ?? error['message'] ?? 'Lỗi khi gửi đánh giá');
@@ -474,8 +532,7 @@ class ApiService {
       throw Exception('Lỗi kết nối: ${e.toString()}');
     }
   }
-  /// Lấy danh sách thông báo của người dùng
-  /// Gọi vào GET /notification
+
   Future<List<dynamic>> getNotifications() async {
     try {
       final response = await http.get(
@@ -484,7 +541,6 @@ class ApiService {
       ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
-        // Backend trả về trực tiếp mảng danh sách hoặc object chứa data
         final decoded = jsonDecode(response.body);
         if (decoded is List) return decoded;
         if (decoded is Map && decoded['data'] is List) return decoded['data'];
@@ -494,6 +550,38 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Lỗi kết nối: $e');
+    }
+  }
+  Future<Map<String, dynamic>> loginWithGoogle(String idToken) async {
+    try {
+      // Lưu ý: Đổi đường dẫn '/googleAuth/mobile-login' tùy theo route bạn đặt trong backend
+      // Dựa vào tên hàm mobileGoogleSignIn, tôi đoán bạn sẽ có route riêng cho mobile
+      final response = await http
+          .post(
+        Uri.parse('$baseUrl/googleAuth/login'), // <-- Kiểm tra lại route này trong file routes
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: jsonEncode({'idToken': idToken}), // Khớp với: const { idToken } = req.body;
+      )
+          .timeout(const Duration(seconds: _timeoutSeconds));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // Backend trả về: { message, token, user_id }
+        if (data['token'] != null) {
+          await _saveToken(data['token']);
+          print('--- GOOGLE LOGIN SUCCESS ---');
+          print('Token: ${data['token']}');
+          print('User ID: ${data['user_id']}');
+        }
+        return data;
+      } else {
+        final error = _safeJsonDecode(response.body);
+        // Khớp với backend: return res.status(401).json({ message: "Token Google không hợp lệ..." });
+        throw Exception(error['message'] ?? 'Đăng nhập Google thất bại (${response.statusCode})');
+      }
+    } catch (e) {
+      rethrow;
     }
   }
 }
