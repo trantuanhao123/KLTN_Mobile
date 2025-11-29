@@ -13,10 +13,15 @@ class ProfileScreen extends StatelessWidget {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         final user = userProvider.user;
-        final avatarUrl = user?['AVATAR_URL'];
-        final fullAvatarUrl = avatarUrl != null
-            ? "${ApiService().baseUrl}/images/$avatarUrl"
-            : null;
+
+        // Logic hiển thị Avatar (Server -> Default -> Icon)
+        final String? avatarUrl = user?['AVATAR_URL'];
+        ImageProvider? avatarProvider;
+        if (avatarUrl != null && !avatarUrl.contains('default-avatar')) {
+          avatarProvider = NetworkImage("${ApiService().baseUrl}/images/$avatarUrl");
+        } else {
+          avatarProvider = const AssetImage('assets/images/default-avatar.png');
+        }
 
         final bool isVerified = (user?['VERIFIED'] == 1 || user?['VERIFIED'] == true);
 
@@ -56,14 +61,13 @@ class ProfileScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
               children: [
+                // --- PHẦN 1: THÔNG TIN USER ---
                 Center(
                   child: CircleAvatar(
                     radius: 50,
                     backgroundColor: Colors.grey.shade800,
-                    backgroundImage: fullAvatarUrl != null
-                        ? NetworkImage(fullAvatarUrl)
-                        : null,
-                    child: fullAvatarUrl == null
+                    backgroundImage: avatarProvider,
+                    child: avatarProvider == null
                         ? const Icon(Icons.person, size: 50, color: Colors.white70)
                         : null,
                   ),
@@ -80,7 +84,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
 
-                // HUY HIỆU XÁC THỰC
+                // Huy hiệu xác thực
                 Center(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -123,6 +127,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 32),
                 const Divider(color: Colors.white24),
+
                 _buildProfileInfoTile(
                   icon: Icons.phone_outlined,
                   title: 'Số điện thoại',
@@ -137,9 +142,46 @@ class ProfileScreen extends StatelessWidget {
                   icon: Icons.cake_outlined,
                   title: 'Ngày sinh',
                   subtitle: user['BIRTHDATE'] != null
-                      ? formatDateString(user['BIRTHDATE']) // Gọi hàm đã sửa
+                      ? formatDateString(user['BIRTHDATE'])
                       : 'Chưa cập nhật',
                 ),
+
+                // --- PHẦN 2: [THÊM MỚI] LIÊN HỆ HỖ TRỢ ---
+                const Padding(
+                  padding: EdgeInsets.only(top: 24.0, bottom: 8.0),
+                  child: Divider(color: Colors.white24),
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12.0),
+                  child: Text(
+                    "Liên hệ hỗ trợ",
+                    style: TextStyle(
+                        color: Color(0xFF1CE88A),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
+                // Email hỗ trợ
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.email_outlined, color: Colors.white70),
+                  title: const Text("Email", style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  subtitle: const Text(
+                    "trantuanhao308@gmail.com",
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                // Số điện thoại hỗ trợ
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.support_agent, color: Colors.white70),
+                  title: const Text("Hotline", style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  subtitle: const Text(
+                    "0931504417",
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                const SizedBox(height: 40), // Khoảng trống dưới cùng
               ],
             ),
           ),
@@ -160,10 +202,8 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // [SỬA LỖI] Thêm .toLocal() để hiển thị đúng múi giờ Việt Nam
   String formatDateString(String dateString) {
     try {
-      // Chuyển đổi từ UTC (Server) sang Local (Điện thoại) trước khi lấy ngày
       final dateTime = DateTime.parse(dateString).toLocal();
       return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
     } catch (e) {

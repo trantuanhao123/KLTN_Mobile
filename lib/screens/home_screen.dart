@@ -10,6 +10,7 @@ import 'package:mobile/api/api_service.dart';
 import 'package:mobile/screens/car_list_screen.dart';
 import 'package:mobile/screens/car_detail_screen.dart';
 import 'package:mobile/screens/notification_screen.dart';
+import 'package:carousel_slider/carousel_slider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,66 +21,337 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   Timer? _notificationTimer;
-  int _lastNotificationId = 0; // Lưu ID thông báo mới nhất để tránh hiện trùng
+  int _lastNotificationId = 0;
 
   @override
   void initState() {
     super.initState();
-
-    // 1. Khởi tạo tính năng thông báo
     LocalNotificationHelper.initialize();
-
-    // 2. Bắt đầu chạy ngầm kiểm tra thông báo mới
     _startNotificationPolling();
   }
 
   @override
   void dispose() {
-    _notificationTimer?.cancel(); // Hủy chạy ngầm khi thoát màn hình
+    _notificationTimer?.cancel();
     super.dispose();
   }
 
-  /// Hàm chạy định kỳ để kiểm tra tin mới
   void _startNotificationPolling() {
-    // Kiểm tra ngay lần đầu mở app
     _checkNewNotifications();
-
-    // Sau đó cứ 60 giây kiểm tra 1 lần
     _notificationTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
       _checkNewNotifications();
     });
   }
 
-  /// Gọi API lấy danh sách và so sánh
   Future<void> _checkNewNotifications() async {
     try {
       final apiService = ApiService();
-      // Gọi API lấy danh sách thông báo
       final notifications = await apiService.getNotifications();
 
       if (notifications.isNotEmpty) {
-        // Sắp xếp để lấy cái mới nhất (ID lớn nhất)
         notifications.sort((a, b) => (b['NOTIFICATION_ID'] ?? 0).compareTo(a['NOTIFICATION_ID'] ?? 0));
-
         final newest = notifications.first;
         final newestId = newest['NOTIFICATION_ID'] as int;
 
-        // Nếu ID mới nhận được > ID đã lưu => Có thông báo mới
         if (_lastNotificationId != 0 && newestId > _lastNotificationId) {
-          // HIỆN THÔNG BÁO "TING TING"
           LocalNotificationHelper.showNotification(
             id: newestId,
             title: newest['TITLE'] ?? 'Thông báo mới',
             body: newest['CONTENT'] ?? 'Bạn có thông báo mới từ hệ thống.',
           );
         }
-
-        // Cập nhật lại ID mới nhất
         _lastNotificationId = newestId;
       }
     } catch (e) {
       debugPrint("Lỗi polling notification: $e");
     }
+  }
+
+  // ==================== HÀM HIỆN POPUP KHI NHẤN BANNER ====================
+  void _showBannerInfo(BuildContext context, Map<String, dynamic> banner) {
+    final apiService = ApiService();
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Container(
+          constraints: const BoxConstraints(maxHeight: 680),
+          decoration: BoxDecoration(
+            color: Colors.grey[900],
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Ảnh banner + nút đóng
+              Stack(
+                children: [
+                  if (banner['IMAGE_URL'] != null)
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                      child: Image.network(
+                        banner['IMAGE_URL'].toString().startsWith('http')
+                            ? banner['IMAGE_URL']
+                            : "${apiService.baseUrl}/images/${banner['IMAGE_URL']}",
+                        height: 220,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 220,
+                          color: Colors.grey[800],
+                          child: const Icon(Icons.image_not_supported, color: Colors.grey, size: 60),
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      height: 220,
+                      decoration: const BoxDecoration(
+                        color: Colors.grey,
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                      ),
+                      child: const Center(child: Icon(Icons.local_offer, size: 80, color: Colors.white54)),
+                    ),
+
+                  // Nút đóng
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black54,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              // Nội dung ưu đãi
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        banner['TITLE'] ?? 'Ưu đãi đặc biệt',
+                        style: const TextStyle(
+                          color: Color(0xFF1CE88A),
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        banner['DESCRIPTION'] ?? 'Đừng bỏ lỡ cơ hội thuê xe với giá cực tốt ngay hôm nay!',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 15,
+                          height: 1.6,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF1CE88A), width: 1),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Color(0xFF1CE88A), size: 20),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Mã giảm giá số lượng có hạn – Nhanh tay dùng ngay!',
+                                style: TextStyle(color: Color(0xFF1CE88A), fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Nút hành động
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context); // Đóng popup trước
+                      // Chuyển sang màn hình thuê xe
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CarListScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.directions_car, color: Colors.black),
+                    label: const Text(
+                      'Đặt xe ngay',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1CE88A),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 4,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ==================== WIDGET BANNER MỚI DÙNG CAROUSEL ====================
+  Widget _buildBannerList(List<dynamic> banners) {
+    if (banners.isEmpty) {
+      return Container(
+        height: 180,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Center(
+          child: Text('Không có ưu đãi nào', style: TextStyle(color: Colors.grey)),
+        ),
+      );
+    }
+
+    final apiService = ApiService();
+
+    return CarouselSlider.builder(
+      itemCount: banners.length,
+      options: CarouselOptions(
+        height: 180,
+        autoPlay: true,
+        autoPlayInterval: const Duration(seconds: 5),
+        enlargeCenterPage: true,
+        viewportFraction: 0.92,
+        aspectRatio: 16 / 9,
+        enableInfiniteScroll: banners.length > 1,
+      ),
+      itemBuilder: (context, index, realIndex) {
+        final banner = banners[index];
+        final String? imageUrlRaw = banner['IMAGE_URL'];
+        final String imageUrl = imageUrlRaw != null && imageUrlRaw.toString().startsWith('http')
+            ? imageUrlRaw
+            : imageUrlRaw != null
+            ? "${apiService.baseUrl}/images/$imageUrlRaw"
+            : '';
+
+        return GestureDetector(
+          onTap: () => _showBannerInfo(context, banner),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.grey[800],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (imageUrl.isNotEmpty)
+                    Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          color: Colors.grey[800],
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF1CE88A),
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[800],
+                          child: const Icon(Icons.broken_image, color: Colors.grey, size: 50),
+                        );
+                      },
+                    )
+                  else
+                    Container(
+                      color: Colors.grey[800],
+                      child: const Icon(Icons.local_offer, color: Colors.white54, size: 60),
+                    ),
+
+                  // Lớp tối dần + tiêu đề
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.7),
+                        ],
+                        stops: const [0.4, 1.0],
+                      ),
+                    ),
+                  ),
+
+                  // Tiêu đề banner
+                  Positioned(
+                    bottom: 16,
+                    left: 16,
+                    right: 16,
+                    child: Text(
+                      banner['TITLE'] ?? 'Ưu đãi đặc biệt',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        shadows: [
+                          Shadow(
+                            blurRadius: 10,
+                            color: Colors.black87,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -104,17 +376,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   backgroundColor: Colors.grey.shade800,
                   backgroundImage: fullAvatarUrl != null ? NetworkImage(fullAvatarUrl) : null,
                   child: fullAvatarUrl == null
-                      ? const Icon(Icons.person_outline, color: Colors.white70, size: 20,)
+                      ? const Icon(Icons.person_outline, color: Colors.white70, size: 20)
                       : null,
                 ),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Xin chào',
-                      style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                    ),
+                    Text('Xin chào', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
                     Text(
                       user?['FULLNAME']?.split(' ').last ?? 'Bạn',
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
@@ -125,12 +394,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             actions: [
               IconButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const NotificationScreen()),
-                  );
-                },
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen())),
                 icon: const Icon(Icons.notifications_none, color: Colors.white),
               ),
             ],
@@ -154,18 +418,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 10),
-                  _buildBannerSection(homeProvider.banners),
+                  // BANNER MỚI ĐÃ THAY THẾ
+                  _buildBannerList(homeProvider.banners),
                   const SizedBox(height: 24),
-                  _buildSectionHeader(context,'Thương hiệu', () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const CarListScreen()));
+
+                  _buildSectionHeader(context, 'Thương hiệu', () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const CarListScreen()));
                   }),
                   _buildBrandsSection(context, homeProvider.brands),
                   const SizedBox(height: 24),
-                  _buildSectionHeader(context,'Xe phổ biến', () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const CarListScreen()));
+
+                  _buildSectionHeader(context, 'Xe phổ biến', () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const CarListScreen()));
                   }),
                   _buildPopularCarsSection(context, homeProvider.popularCars),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 30),
                 ],
               ),
             ),
@@ -175,8 +442,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- CÁC WIDGET UI ---
-
+  // Các hàm UI khác
   Widget _buildSectionHeader(BuildContext context, String title, VoidCallback onViewAll) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -186,10 +452,10 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           TextButton(
             onPressed: onViewAll,
-            style: TextButton.styleFrom(foregroundColor: Colors.grey[400], padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
-            child: Row(
+            style: TextButton.styleFrom(foregroundColor: Colors.grey[400], padding: EdgeInsets.zero),
+            child: const Row(
               mainAxisSize: MainAxisSize.min,
-              children: const [Text('Xem tất cả'), SizedBox(width: 4), Icon(Icons.arrow_forward_ios, size: 12)],
+              children: [Text('Xem tất cả'), SizedBox(width: 4), Icon(Icons.arrow_forward_ios, size: 12)],
             ),
           ),
         ],
@@ -197,43 +463,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBannerSection(List<dynamic> banners) {
-    if (banners.isEmpty) {
-      return Container(
-        height: 150, margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(20)),
-        child: const Center(child: Text("Không có ưu đãi", style: TextStyle(color: Colors.grey))),
-      );
-    }
-    return Container(
-      height: 150, margin: const EdgeInsets.symmetric(vertical: 16),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal, itemCount: banners.length, padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        itemBuilder: (context, index) {
-          final banner = banners[index];
-          final imageUrl = banner['IMAGE_URL'] != null ? "${ApiService().baseUrl}/images/${banner['IMAGE_URL']}" : null;
-          return Container(
-            width: 300, padding: const EdgeInsets.only(right: 16),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  imageUrl != null ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(color: Colors.grey[800], child: const Icon(Icons.error_outline, color: Colors.grey))) : Container(color: Colors.grey[800], child: const Icon(Icons.image, color: Colors.grey)),
-                  Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black.withOpacity(0.7)], stops: const [0.5, 1.0]))),
-                  Positioned(bottom: 16, left: 16, right: 16, child: Text(banner['TITLE'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, shadows: [Shadow(blurRadius: 2, color: Colors.black54)]), maxLines: 2, overflow: TextOverflow.ellipsis)),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Widget _buildBrandsSection(BuildContext context, List<String> brands) {
     if (brands.isEmpty) return const SizedBox.shrink();
-
     return SizedBox(
       height: 90,
       child: ListView.builder(
@@ -243,40 +474,26 @@ class _HomeScreenState extends State<HomeScreen> {
         itemBuilder: (context, index) {
           final brandName = brands[index];
           final firstLetter = brandName.isNotEmpty ? brandName[0].toUpperCase() : '?';
-
           return Padding(
             padding: const EdgeInsets.only(right: 20.0),
             child: GestureDetector(
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => CarListScreen(initialBrandFilter: brandName)));
-              },
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CarListScreen(initialBrandFilter: brandName))),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Ô tròn chứa chữ cái
                   Container(
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      color: Colors.grey[800], // Màu nền xám
+                      color: Colors.grey[800],
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.grey.shade700, width: 1),
                     ),
                     alignment: Alignment.center,
-                    child: Text(
-                      firstLetter,
-                      style: const TextStyle(
-                        color: Color(0xFF1CE88A),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 22,
-                      ),
-                    ),
+                    child: Text(firstLetter, style: const TextStyle(color: Color(0xFF1CE88A), fontWeight: FontWeight.bold, fontSize: 22)),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                      brandName,
-                      style: const TextStyle(color: Colors.white70, fontSize: 12)
-                  ),
+                  Text(brandName, style: const TextStyle(color: Colors.white70, fontSize: 12)),
                 ],
               ),
             ),
@@ -291,22 +508,39 @@ class _HomeScreenState extends State<HomeScreen> {
     return SizedBox(
       height: 195,
       child: ListView.builder(
-        scrollDirection: Axis.horizontal, itemCount: popularCars.length, padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        scrollDirection: Axis.horizontal,
+        itemCount: popularCars.length,
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
         itemBuilder: (context, index) {
           final car = popularCars[index];
           final imageUrl = car['mainImageUrl'];
           final fullCarImageUrl = imageUrl != null ? "${ApiService().baseUrl}/images/$imageUrl" : null;
+
           return Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: GestureDetector(
-              onTap: () { Navigator.push(context, MaterialPageRoute(builder: (context) => CarDetailScreen(car: car))); },
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CarDetailScreen(car: car))),
               child: Container(
-                width: 150, decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(12)), clipBehavior: Clip.antiAlias,
+                width: 150,
+                decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(12)),
+                clipBehavior: Clip.antiAlias,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(child: Container(color: Colors.grey[800], child: fullCarImageUrl != null ? Image.network(fullCarImageUrl, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Center(child: Icon(Icons.broken_image_outlined, color: Colors.grey, size: 40))) : const Center(child: Icon(Icons.directions_car, color: Colors.grey, size: 50)))),
-                    Padding(padding: const EdgeInsets.all(10.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [Text("${car['BRAND'] ?? ''} ${car['MODEL'] ?? ''}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, height: 1.3), maxLines: 2, overflow: TextOverflow.ellipsis)])),
+                    Expanded(
+                      child: fullCarImageUrl != null
+                          ? Image.network(fullCarImageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, color: Colors.grey, size: 40))
+                          : const Icon(Icons.directions_car, color: Colors.grey, size: 50),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: Text(
+                        "${car['BRAND'] ?? ''} ${car['MODEL'] ?? ''}",
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -318,17 +552,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+// LocalNotificationHelper giữ nguyên như cũ
 class LocalNotificationHelper {
-  static final FlutterLocalNotificationsPlugin _notificationsPlugin =
-  FlutterLocalNotificationsPlugin();
+  static final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
 
-  // Khởi tạo (Gọi ở initState)
   static Future<void> initialize() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
     AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const DarwinInitializationSettings initializationSettingsDarwin =
-    DarwinInitializationSettings();
+    const DarwinInitializationSettings initializationSettingsDarwin = DarwinInitializationSettings();
 
     const InitializationSettings initializationSettings = InitializationSettings(
       android: initializationSettingsAndroid,
@@ -339,30 +571,26 @@ class LocalNotificationHelper {
 
     if (Platform.isAndroid) {
       await _notificationsPlugin
-          .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
           ?.requestNotificationsPermission();
     }
   }
 
-  // Hàm hiển thị thông báo
   static Future<void> showNotification({
     required int id,
     required String title,
     required String body,
   }) async {
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'promotion_channel', // ID kênh
-      'Khuyến mãi & Tin tức', // Tên kênh
+      'promotion_channel',
+      'Khuyến mãi & Tin tức',
       channelDescription: 'Nhận thông báo mới từ hệ thống',
       importance: Importance.max,
       priority: Priority.high,
       showWhen: true,
     );
 
-    const NotificationDetails details =
-    NotificationDetails(android: androidDetails);
-
+    const NotificationDetails details = NotificationDetails(android: androidDetails);
     await _notificationsPlugin.show(id, title, body, details);
   }
 }

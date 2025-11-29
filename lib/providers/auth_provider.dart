@@ -16,7 +16,7 @@ class AuthProvider with ChangeNotifier {
     String? token = await _apiService.getToken();
     if (token != null) {
       try {
-        await _apiService.getUserProfile(); // Thử gọi API cần token
+        await _apiService.getUserProfile();
         _isAuthenticated = true;
       } catch (e) {
         if (e.toString().contains('Phiên đăng nhập hết hạn')) {
@@ -50,7 +50,6 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // --- [BỔ SUNG HÀM NÀY ĐỂ SỬA LỖI] ---
   Future<void> loginWithGoogle(String idToken) async {
     try {
       // Gọi API Service để gửi token lên Backend

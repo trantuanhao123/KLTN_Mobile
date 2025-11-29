@@ -5,10 +5,8 @@ import 'package:mime/mime.dart';
 import 'package:http_parser/http_parser.dart';
 
 class ApiService {
-  // Thay đổi IP này thành IP máy tính của bạn
-  // Nếu dùng Emulator Android → dùng http://10.0.2.2:8080
-  // Nếu dùng máy thật -> dùng IP LAN (ví dụ 192.168.1.x)
-  static const String _baseUrl = "http://192.168.1.9:8080";
+
+  static const String _baseUrl = "https://kltn-backend-zceg.onrender.com";
   static const int _timeoutSeconds = 30;
 
   String get baseUrl => _baseUrl;
@@ -236,14 +234,14 @@ class ApiService {
 
       final mimeFront = lookupMimeType(frontPath)?.split('/');
       request.files.add(await http.MultipartFile.fromPath(
-        'license_front', // Phải khớp với config multer trong routes/userRoutes.js
+        'license_front', // Phải khớp với config multer trong backend
         frontPath,
         contentType: mimeFront != null ? MediaType(mimeFront[0], mimeFront[1]) : null,
       ));
 
       final mimeBack = lookupMimeType(backPath)?.split('/');
       request.files.add(await http.MultipartFile.fromPath(
-        'license_back', // Phải khớp với config multer trong routes/userRoutes.js
+        'license_back', // Phải khớp với config multer trong backend
         backPath,
         contentType: mimeBack != null ? MediaType(mimeBack[0], mimeBack[1]) : null,
       ));
@@ -306,7 +304,6 @@ class ApiService {
   Future<List<Map<String, dynamic>>> getCars() async {
     try {
       final headers = await _getHeaders();
-      // Nếu muốn lấy chỉ xe khả dụng cho user, hãy đổi thành: '$baseUrl/car/available'
       final response = await http
           .get(Uri.parse('$baseUrl/car'), headers: headers)
           .timeout(Duration(seconds: _timeoutSeconds));
@@ -554,20 +551,16 @@ class ApiService {
   }
   Future<Map<String, dynamic>> loginWithGoogle(String idToken) async {
     try {
-      // Lưu ý: Đổi đường dẫn '/googleAuth/mobile-login' tùy theo route bạn đặt trong backend
-      // Dựa vào tên hàm mobileGoogleSignIn, tôi đoán bạn sẽ có route riêng cho mobile
       final response = await http
           .post(
-        Uri.parse('$baseUrl/googleAuth/login'), // <-- Kiểm tra lại route này trong file routes
+        Uri.parse('$baseUrl/googleAuth/login'),
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
-        body: jsonEncode({'idToken': idToken}), // Khớp với: const { idToken } = req.body;
+        body: jsonEncode({'idToken': idToken}),
       )
           .timeout(const Duration(seconds: _timeoutSeconds));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
-        // Backend trả về: { message, token, user_id }
         if (data['token'] != null) {
           await _saveToken(data['token']);
           print('--- GOOGLE LOGIN SUCCESS ---');
@@ -577,7 +570,6 @@ class ApiService {
         return data;
       } else {
         final error = _safeJsonDecode(response.body);
-        // Khớp với backend: return res.status(401).json({ message: "Token Google không hợp lệ..." });
         throw Exception(error['message'] ?? 'Đăng nhập Google thất bại (${response.statusCode})');
       }
     } catch (e) {

@@ -26,7 +26,7 @@ class _BookingScreenState extends State<BookingScreen> {
   String _paymentOption = 'full';
   bool _isLoading = false;
 
-  // MỚI THÊM: State cho việc kiểm tra mã giảm giá
+  // State cho việc kiểm tra mã giảm giá
   Map<String, dynamic>? _validatedDiscount; // Lưu thông tin mã hợp lệ
   String? _discountCheckMessage; // Thông báo kết quả check mã
   bool _isCheckingDiscount = false; // Trạng thái đang kiểm tra mã
@@ -59,7 +59,7 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
-  // MỚI THÊM: Tính toán số tiền giảm giá
+  // Tính toán số tiền giảm giá
   double get _discountAmount {
     if (_validatedDiscount == null || _totalPrice == 0) return 0.0;
 
@@ -79,12 +79,12 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
-  // MỚI THÊM: Tính toán giá cuối cùng
+  // Tính toán giá cuối cùng
   double get _finalPrice {
     return _totalPrice - _discountAmount;
   }
 
-  // MỚI THÊM: Hàm xử lý áp dụng mã
+  // Hàm xử lý áp dụng mã
   Future<void> _applyDiscountCode() async {
     final code = _discountCodeController.text.trim().toUpperCase();
     if (code.isEmpty) {
@@ -174,7 +174,7 @@ class _BookingScreenState extends State<BookingScreen> {
           _selectedDate = picked.start;
           _startTime = null;
           _endTime = null;
-          _validatedDiscount = null; // SỬA ĐỔI: Reset mã khi đổi ngày
+          _validatedDiscount = null; // Reset mã khi đổi ngày
           _discountCheckMessage = null;
         });
       }
@@ -263,7 +263,7 @@ class _BookingScreenState extends State<BookingScreen> {
               _startTime = pickedStartTime;
               _endTime = pickedEndTime;
               _selectedDateRange = null;
-              _validatedDiscount = null; // SỬA ĐỔI: Reset mã khi đổi giờ
+              _validatedDiscount = null; // Reset mã khi đổi giờ
               _discountCheckMessage = null;
             });
           }
@@ -289,14 +289,14 @@ class _BookingScreenState extends State<BookingScreen> {
       isValidSelection = true;
     }
 
-    if (!isValidSelection || _totalPrice <= 0) { // SỬA ĐỔI: Thêm check _totalPrice
+    if (!isValidSelection || _totalPrice <= 0) { // Thêm check _totalPrice
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng chọn thời gian thuê hợp lệ.'), backgroundColor: Colors.orange),
       );
       return;
     }
 
-    // SỬA ĐỔI: Check nếu mã đang nhập khác mã đã validate
+    // Check nếu mã đang nhập khác mã đã validate
     final currentCode = _discountCodeController.text.trim().toUpperCase();
     String? codeWarning;
     if (currentCode.isNotEmpty && (_validatedDiscount == null || _validatedDiscount!['CODE'] != currentCode)) {
@@ -308,7 +308,7 @@ class _BookingScreenState extends State<BookingScreen> {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) { // Thêm BuildContext
-        // SỬA ĐỔI: Định dạng tiền tệ
+        // Định dạng tiền tệ
         final priceFormat = NumberFormat.simpleCurrency(locale: 'vi-VN', decimalDigits: 0);
 
         return AlertDialog(
@@ -323,7 +323,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 if (_rentalMode == RentalMode.hour && _selectedDate != null && _startTime != null && _endTime != null)
                   Text('Thời gian: ${DateFormat('dd/MM/yyyy').format(_selectedDate!)} (${_startTime!.format(context)} - ${_endTime!.format(context)}) (${_numberOfHours} giờ)', style: const TextStyle(color: Colors.white)),
 
-                // SỬA ĐỔI: Hiển thị chi tiết giá
+                // Hiển thị chi tiết giá
                 const SizedBox(height: 10),
                 Text('Tổng tiền: ${priceFormat.format(_totalPrice)}', style: const TextStyle(color: Colors.white)),
 
@@ -339,7 +339,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 if (_discountAmount == 0) // Hiển thị tổng nếu không giảm giá
                   Text('Thành tiền: ${priceFormat.format(_totalPrice)}', style: const TextStyle(color: Color(0xFF1CE88A), fontWeight: FontWeight.bold, fontSize: 16)),
 
-                if (codeWarning != null) // MỚI THÊM: Cảnh báo mã chưa áp dụng
+                if (codeWarning != null) // Cảnh báo mã chưa áp dụng
                   Padding(
                     padding: const EdgeInsets.only(top: 10.0),
                     child: Text(codeWarning, style: const TextStyle(color: Colors.orange, fontStyle: FontStyle.italic, fontSize: 13)),
@@ -460,11 +460,10 @@ Chi phí Phát sinh & Bồi thường
         startDate: startDateFormatted,
         endDate: endDateFormatted,
         paymentOption: _paymentOption,
-        discountCode: codeToSubmit, // SỬA ĐỔI: Gửi mã từ controller
+        discountCode: codeToSubmit, // Gửi mã từ controller
         rentalType: rentalTypeParam,
       );
 
-      // SỬA LỖI: Bỏ `context` thừa, chỉ cần truyền Route
       final result = await navigator.push(
         MaterialPageRoute(builder: (context) => PaymentWebViewScreen(url: paymentUrl)),
       );
@@ -592,7 +591,7 @@ Chi phí Phát sinh & Bồi thường
                               }
                               _startTime = null;
                               _endTime = null;
-                              _validatedDiscount = null; // SỬA ĐỔI: Reset mã
+                              _validatedDiscount = null; // Reset mã
                               _discountCheckMessage = null;
                             });
                           }
@@ -618,7 +617,7 @@ Chi phí Phát sinh & Bồi thường
                               _selectedDateRange = null;
                               _startTime = null;
                               _endTime = null;
-                              _validatedDiscount = null; // SỬA ĐỔI: Reset mã
+                              _validatedDiscount = null; // Reset mã
                               _discountCheckMessage = null;
                             });
                           }
@@ -695,7 +694,7 @@ Chi phí Phát sinh & Bồi thường
                         ),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       ),
-                      // SỬA ĐỔI: Khi người dùng sửa mã, reset mã đã validate
+                      // Khi người dùng sửa mã, reset mã đã validate
                       onChanged: (value) {
                         if (_validatedDiscount != null && value.trim().toUpperCase() != _validatedDiscount!['CODE']) {
                           setState(() {
@@ -724,7 +723,7 @@ Chi phí Phát sinh & Bồi thường
                   ),
                 ],
               ),
-              // MỚI THÊM: Hiển thị thông báo check mã
+              // Hiển thị thông báo check mã
               if (_discountCheckMessage != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8.0),
@@ -792,7 +791,7 @@ Chi phí Phát sinh & Bồi thường
                 ],
               ),
 
-              // MỚI THÊM: Hiển thị tiền giảm giá
+              // Hiển thị tiền giảm giá
               if (_discountAmount > 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 12.0),
@@ -814,7 +813,7 @@ Chi phí Phát sinh & Bồi thường
                 children: [
                   Text('Thành tiền:', style: TextStyle(color: Colors.grey[400], fontSize: 18)),
                   Text(
-                    priceFormat.format(_finalPrice), // SỬA ĐỔI: Dùng giá cuối cùng
+                    priceFormat.format(_finalPrice), // Dùng giá cuối cùng
                     style: const TextStyle(color: Color(0xFF1CE88A), fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                 ],
@@ -838,7 +837,6 @@ Chi phí Phát sinh & Bồi thường
                                 backgroundColor: Colors.grey[850],
                                 title: const Text("Chính Sách Chi Tiết", style: TextStyle(color: Colors.white)),
                                 content: const SingleChildScrollView(
-                                  // SỬA LỖI: Thêm nội dung vào Text()
                                   child: Text(
                                     '''
 Chính sách Hủy Chuyến

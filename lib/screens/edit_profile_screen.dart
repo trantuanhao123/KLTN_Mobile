@@ -35,7 +35,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _phoneController = TextEditingController(text: user?['PHONE']);
     _addressController = TextEditingController(text: user?['ADDRESS']);
 
-    // Sửa lỗi ngày sinh bị lùi 1 ngày do múi giờ UTC
+    // Xử lý ngày sinh
     _birthdateController = TextEditingController(
       text: user?['BIRTHDATE'] != null
           ? DateFormat('dd/MM/yyyy').format(
@@ -135,7 +135,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // 3. Chuẩn bị ngày sinh gửi lên server
       String? birthdatePayload;
       if (_birthdateController.text.isNotEmpty) {
-        final parsedDate = DateFormat('dd/MM/yyyy').parse(_birthdateController.text);
+        final parsedDate =
+        DateFormat('dd/MM/yyyy').parse(_birthdateController.text);
         birthdatePayload = DateFormat('yyyy-MM-dd').format(parsedDate);
       }
 
@@ -172,18 +173,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  // logic đổi mật khẩu trực tiếp
   void _showChangePasswordDialog() {
     final apiService = ApiService();
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
+    final oldPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
-    final otpController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
 
-    bool isOtpSent = false;
     bool isDialogLoading = false;
-    String? dialogError;
 
     showDialog(
       context: context,
@@ -192,75 +192,73 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: Colors.grey[900],
-              title: Text(
-                isOtpSent ? 'Xác thực OTP' : 'Đổi Mật Khẩu Mới',
-                style: const TextStyle(color: Colors.white),
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!isOtpSent) ...[
+              title: const Text('Đổi Mật Khẩu',
+                  style: TextStyle(color: Colors.white)),
+              content: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                       const Text(
-                        'Nhập mật khẩu mới. Mã OTP sẽ gửi về email.',
-                        style: TextStyle(color: Colors.grey),
+                        'Nhập mật khẩu cũ và mật khẩu mới để thay đổi.',
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
                       ),
                       const SizedBox(height: 16),
-                      _buildDialogTextField(newPasswordController, 'Mật khẩu mới', isPassword: true),
-                      const SizedBox(height: 16),
-                      _buildDialogTextField(confirmPasswordController, 'Xác nhận mật khẩu', isPassword: true),
-                    ] else ...[
-                      Text(
-                        'Mã OTP đã gửi đến ${userProvider.user?['EMAIL']}.',
-                        style: const TextStyle(color: Colors.grey),
+                      // Mật khẩu cũ
+                      _buildDialogTextField(
+                        oldPasswordController,
+                        'Mật khẩu cũ',
+                        isPassword: true,
+                        validator: (val) => val == null || val.isEmpty
+                            ? 'Vui lòng nhập mật khẩu cũ'
+                            : null,
                       ),
                       const SizedBox(height: 16),
-                      _buildDialogTextField(otpController, 'Nhập mã OTP', keyboardType: TextInputType.number),
+                      // Mật khẩu mới
+                      _buildDialogTextField(
+                        newPasswordController,
+                        'Mật khẩu mới',
+                        isPassword: true,
+                        validator: (val) => val != null && val.length < 6
+                            ? 'Mật khẩu phải trên 6 ký tự'
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+                      // Xác nhận mật khẩu mới
+                      _buildDialogTextField(
+                        confirmPasswordController,
+                        'Xác nhận mật khẩu mới',
+                        isPassword: true,
+                        validator: (val) => val != newPasswordController.text
+                            ? 'Mật khẩu xác nhận không khớp'
+                            : null,
+                      ),
                     ],
-                    if (dialogError != null) ...[
-                      const SizedBox(height: 8),
-                      Text(dialogError!, style: const TextStyle(color: Colors.red, fontSize: 12)),
-                    ],
-                  ],
+                  ),
                 ),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+                  child:
+                  const Text('Hủy', style: TextStyle(color: Colors.grey)),
                 ),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1CE88A)),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1CE88A)),
                   onPressed: isDialogLoading
                       ? null
                       : () async {
-                    setDialogState(() {
-                      isDialogLoading = true;
-                      dialogError = null;
-                    });
-
-                    try {
-                      final userEmail = userProvider.user?['EMAIL'];
-                      if (userEmail == null) throw Exception("Không tìm thấy email người dùng.");
-
-                      if (!isOtpSent) {
-                        if (newPasswordController.text.length < 6) {
-                          throw Exception("Mật khẩu phải > 6 ký tự.");
-                        }
-                        if (newPasswordController.text != confirmPasswordController.text) {
-                          throw Exception("Mật khẩu không khớp.");
-                        }
-                        await apiService.requestPasswordReset(userEmail);
-                        setDialogState(() => isOtpSent = true);
-                      } else {
-                        if (otpController.text.length != 6) {
-                          throw Exception("OTP phải có 6 số.");
-                        }
-                        await apiService.verifyOtpAndResetPassword(
-                          email: userEmail,
-                          otp: otpController.text,
-                          newPassword: newPasswordController.text,
+                    if (formKey.currentState!.validate()) {
+                      setDialogState(() => isDialogLoading = true);
+                      try {
+                        // Gọi API đổi mật khẩu (không cần OTP)
+                        await apiService.changePassword(
+                          oldPasswordController.text,
+                          newPasswordController.text,
                         );
+                        if (!mounted) return;
                         Navigator.of(context).pop();
                         scaffoldMessenger.showSnackBar(
                           const SnackBar(
@@ -268,25 +266,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             backgroundColor: Colors.green,
                           ),
                         );
+                      } catch (e) {
+                        scaffoldMessenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                                'Lỗi: ${e.toString().replaceFirst("Exception: ", "")}'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      } finally {
+                        setDialogState(() => isDialogLoading = false);
                       }
-                    } catch (e) {
-                      setDialogState(() {
-                        dialogError = e.toString().replaceFirst("Exception: ", "");
-                      });
-                    } finally {
-                      setDialogState(() => isDialogLoading = false);
                     }
                   },
                   child: isDialogLoading
                       ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.black),
                   )
-                      : Text(
-                    isOtpSent ? 'Xác Nhận' : 'Gửi Mã OTP',
-                    style: const TextStyle(color: Colors.black),
-                  ),
+                      : const Text('Lưu thay đổi',
+                      style: TextStyle(color: Colors.black)),
                 ),
               ],
             );
@@ -300,10 +301,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     final user = Provider.of<UserProvider>(context).user;
 
+    // Xử lý hiển thị Avatar
+    final avatarUrl = user?['AVATAR_URL'];
+    final fullAvatarUrl = avatarUrl != null
+        ? "${ApiService().baseUrl}/images/$avatarUrl"
+        : null;
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Chỉnh Sửa Hồ Sơ', style: TextStyle(color: Colors.white)),
+        title: const Text('Chỉnh Sửa Hồ Sơ',
+            style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.transparent,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -321,13 +329,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   CircleAvatar(
                     radius: 50,
                     backgroundColor: Colors.grey.shade800,
+                    // Ưu tiên hiển thị ảnh mới chọn, sau đó đến ảnh từ server
                     backgroundImage: _avatarImage != null
                         ? FileImage(_avatarImage!)
-                        : (user?['AVATAR_URL'] != null
-                        ? NetworkImage("${ApiService().baseUrl}/images/${user!['AVATAR_URL']}")
+                        : (fullAvatarUrl != null
+                        ? NetworkImage(fullAvatarUrl)
                         : null) as ImageProvider?,
-                    child: (user?['AVATAR_URL'] == null && _avatarImage == null)
-                        ? const Icon(Icons.person, size: 50, color: Colors.white70)
+                    // Nếu không có ảnh nào thì hiện icon
+                    child: (fullAvatarUrl == null && _avatarImage == null)
+                        ? const Icon(Icons.person,
+                        size: 50, color: Colors.white70)
                         : null,
                   ),
                   Positioned(
@@ -338,7 +349,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       child: const CircleAvatar(
                         radius: 16,
                         backgroundColor: Color(0xFF1CE88A),
-                        child: Icon(Icons.camera_alt, color: Colors.black, size: 16),
+                        child: Icon(Icons.camera_alt,
+                            color: Colors.black, size: 16),
                       ),
                     ),
                   ),
@@ -348,9 +360,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 24),
 
             _buildSectionTitle("Thông tin cá nhân"),
-            _buildTextFormField(_fullnameController, 'Họ và Tên'),
+            _buildTextFormField(_fullnameController, 'Họ và Tên',
+                validator: (v) =>
+                v!.isEmpty ? 'Tên không được để trống' : null),
             const SizedBox(height: 16),
-            _buildTextFormField(_phoneController, 'Số điện thoại'),
+            _buildTextFormField(_phoneController, 'Số điện thoại',
+                keyboardType: TextInputType.phone),
             const SizedBox(height: 16),
             _buildTextFormField(_addressController, 'Địa chỉ'),
             const SizedBox(height: 16),
@@ -362,9 +377,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               decoration: const InputDecoration(
                 labelText: 'Ngày sinh (dd/MM/yyyy)',
                 labelStyle: TextStyle(color: Colors.white70),
-                suffixIcon: Icon(Icons.calendar_today, color: Colors.white70),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF1CE88A))),
+                suffixIcon:
+                Icon(Icons.calendar_today, color: Colors.white70),
+                enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white24)),
+                focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF1CE88A))),
               ),
             ),
 
@@ -401,10 +419,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             _buildSectionTitle("Bảo mật"),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.lock_outline, color: Colors.white70),
-              title: const Text('Đổi mật khẩu', style: TextStyle(color: Colors.white)),
-              trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 16),
-              onTap: _showChangePasswordDialog,
+              leading:
+              const Icon(Icons.lock_outline, color: Colors.white70),
+              title: const Text('Đổi mật khẩu',
+                  style: TextStyle(color: Colors.white)),
+              trailing: const Icon(Icons.arrow_forward_ios,
+                  color: Colors.white70, size: 16),
+              onTap:
+              _showChangePasswordDialog, // Gọi hàm đổi mật khẩu mới
             ),
 
             const SizedBox(height: 32),
@@ -418,7 +440,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 child: const Text(
                   'Lưu Thay Đổi',
-                  style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -442,54 +467,74 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             height: 100,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: Colors.grey.shade900,
+              color: Colors.white, // Đặt nền trắng để dễ nhìn ảnh trong suốt
               border: Border.all(color: Colors.white24),
               borderRadius: BorderRadius.circular(8),
-              image: imageFile != null
-                  ? DecorationImage(image: FileImage(imageFile), fit: BoxFit.cover)
-                  : networkUrl != null
-                  ? DecorationImage(
-                image: NetworkImage("${ApiService().baseUrl}/images/$networkUrl"),
-                fit: BoxFit.cover,
-              )
-                  : null,
             ),
-            child: (imageFile == null && networkUrl == null)
-                ? const Icon(Icons.add_a_photo, color: Colors.white54, size: 32)
-                : null,
+            // Sử dụng ClipRRect để bo góc ảnh bên trong container
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: imageFile != null
+                  ? Image.file(imageFile,
+                  fit: BoxFit.contain) // Dùng contain để thấy toàn bộ
+                  : (networkUrl != null
+                  ? Image.network(
+                "${ApiService().baseUrl}/images/$networkUrl",
+                fit: BoxFit.contain, // Dùng contain để thấy toàn bộ
+                errorBuilder: (context, error, stackTrace) =>
+                const Center(
+                    child: Icon(Icons.broken_image,
+                        color: Colors.grey)),
+              )
+                  : const Center(
+                  child: Icon(Icons.add_a_photo,
+                      color: Colors.black54, size: 32))),
+            ),
           ),
         ),
         const SizedBox(height: 6),
-        Text(title, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        Text(title,
+            style: const TextStyle(color: Colors.white70, fontSize: 12)),
       ],
     );
   }
 
-  Widget _buildTextFormField(TextEditingController controller, String label) {
+  Widget _buildTextFormField(TextEditingController controller, String label,
+      {TextInputType? keyboardType, String? Function(String?)? validator}) {
     return TextFormField(
       controller: controller,
+      keyboardType: keyboardType,
       style: const TextStyle(color: Colors.white),
+      validator: validator,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: Colors.white70),
-        enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-        focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF1CE88A))),
+        enabledBorder: const OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.white24)),
+        focusedBorder: const OutlineInputBorder(
+            borderSide: BorderSide(color: Color(0xFF1CE88A))),
       ),
     );
   }
 
   Widget _buildDialogTextField(TextEditingController controller, String label,
-      {bool isPassword = false, TextInputType? keyboardType}) {
+      {bool isPassword = false,
+        TextInputType? keyboardType,
+        String? Function(String?)? validator}) {
     return TextFormField(
       controller: controller,
       obscureText: isPassword,
       keyboardType: keyboardType,
       style: const TextStyle(color: Colors.white),
+      validator: validator,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: Colors.grey),
-        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
-        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF1CE88A))),
+        enabledBorder: const UnderlineInputBorder(
+            borderSide: BorderSide(color: Colors.grey)),
+        focusedBorder: const UnderlineInputBorder(
+            borderSide: BorderSide(color: Color(0xFF1CE88A))),
+        errorStyle: const TextStyle(color: Colors.redAccent),
       ),
     );
   }
@@ -499,7 +544,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Text(
         title,
-        style: const TextStyle(color: Color(0xFF1CE88A), fontSize: 18, fontWeight: FontWeight.bold),
+        style: const TextStyle(
+            color: Color(0xFF1CE88A),
+            fontSize: 18,
+            fontWeight: FontWeight.bold),
       ),
     );
   }

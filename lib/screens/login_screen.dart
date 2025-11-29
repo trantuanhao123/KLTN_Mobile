@@ -22,14 +22,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // CẤU HÌNH GOOGLE SIGN IN
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId: 'ClientId.apps.googleusercontent.com',
+    serverClientId: '463080509916-8cigt5q0fdpt6qm9g5rcorlalbm1iq5r.apps.googleusercontent.com',
     scopes: ['email', 'profile'],
   );
 
   @override
   void initState() {
     super.initState();
-    // Không gán text mặc định ở đây nữa để tránh phải xóa thủ công
   }
 
   // Đăng nhập bằng email/password
@@ -136,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 48),
 
-              // Email field (Thêm hintText)
+              // Email field
               _buildTextField(
                 controller: _emailController,
                 label: 'Email',
@@ -145,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Password field (Thêm hintText)
+              // Password field
               _buildTextField(
                 controller: _passwordController,
                 label: 'Mật khẩu',
@@ -256,7 +255,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
-    String? hintText, // <--- Thêm tham số này
+    String? hintText,
     bool isPassword = false,
     TextInputType keyboardType = TextInputType.text,
   }) {

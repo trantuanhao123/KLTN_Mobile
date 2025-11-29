@@ -35,7 +35,6 @@ class CarProvider with ChangeNotifier {
 
       // Xử lý chuẩn hóa dữ liệu xe
       _allCars = results[0].map((car) {
-        // Backend có thể trả về 'mainImageUrl', 'IMAGE_URL' hoặc 'imageUrl'
         car['image'] = car['mainImageUrl'] ?? car['IMAGE_URL'] ?? car['imageUrl'] ?? '';
         car['thumbnail'] = car['mainImageUrl'] ?? car['imageUrl'] ?? '';
         return car;

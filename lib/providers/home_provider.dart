@@ -36,12 +36,11 @@ class HomeProvider with ChangeNotifier {
 
       // Xử lý dữ liệu xe
       final allCars = results[1].map((car) {
-        // Map mainImageUrl sang key phổ thông để widget dễ dùng
         car['image'] = car['mainImageUrl'] ?? '';
         return car;
       }).toList();
 
-      // Lấy danh sách thương hiệu (BRAND)
+      // Lấy danh sách thương hiệu
       final brandSet = <String>{};
       for (var car in allCars) {
         // Kiểm tra null safety và ép kiểu String

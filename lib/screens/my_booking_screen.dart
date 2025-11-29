@@ -17,6 +17,14 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
   final _bankNameController = TextEditingController();
   final _refundFormKey = GlobalKey<FormState>();
 
+  // Danh sách ngân hàng hỗ trợ
+  final List<String> _supportedBanks = [
+    'Vietcombank',
+    'BIDV',
+    'VietinBank',
+    'Agribank'
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -30,39 +38,27 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
     super.dispose();
   }
 
-  /// [SỬA ĐỔI QUAN TRỌNG]: Hàm này thực hiện "Client-side Join"
-  /// Nó gọi 2 API cùng lúc: lấy đơn hàng và lấy tất cả xe
-  /// Sau đó tự ghép thông tin xe vào đơn hàng dựa trên CAR_ID
   Future<List<dynamic>> _fetchBookingsWithCarDetails() async {
     try {
-      // 1. Gọi song song 2 API
       final results = await Future.wait([
-        apiService.getUserBookings(), // Index 0: Danh sách đơn (đang thiếu info xe)
-        apiService.getCars(),         // Index 1: Danh sách tất cả xe (đầy đủ info)
+        apiService.getUserBookings(),
+        apiService.getCars(),
       ]);
 
       final bookings = results[0] as List<dynamic>;
       final cars = results[1] as List<dynamic>;
 
-      // 2. Tạo Map cho danh sách xe để tra cứu nhanh (Key: CAR_ID)
       final Map<int, dynamic> carMap = {
         for (var c in cars) c['CAR_ID']: c
       };
 
-      // 3. Duyệt qua từng đơn hàng và ghép thông tin xe vào
       for (var booking in bookings) {
         final carId = booking['CAR_ID'];
-        // Nếu tìm thấy xe trong danh sách xe tải về, gán vào biến 'Car'
         if (carId != null && carMap.containsKey(carId)) {
           var carInfo = carMap[carId];
-
-          // Chuẩn hóa dữ liệu ảnh (vì API getCars có thể trả về cấu trúc hơi khác)
-          // Đảm bảo trường mainImageUrl tồn tại để UI sử dụng
           carInfo['mainImageUrl'] = carInfo['mainImageUrl'] ?? carInfo['IMAGE_URL'] ?? carInfo['imageUrl'];
-
           booking['Car'] = carInfo;
         } else {
-          // Trường hợp xe đã bị xóa hoặc không tìm thấy, tạo object rỗng để tránh lỗi
           booking['Car'] = {};
         }
       }
@@ -75,17 +71,11 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
 
   void _loadBookings() {
     setState(() {
-      // Gọi hàm mới thay vì gọi trực tiếp apiService.getUserBookings()
       _bookingsFuture = _fetchBookingsWithCarDetails();
     });
   }
 
-  // ... [GIỮ NGUYÊN CÁC HÀM LOGIC KHÁC KHÔNG THAY ĐỔI] ...
-  // (Phần Review, Hủy đơn, Đổi lịch... giữ nguyên như cũ)
-
-  // =======================================================================
-  // PHẦN LOGIC ĐÁNH GIÁ (REVIEW)
-  // =======================================================================
+  // PHẦN LOGIC ĐÁNH GIÁ
   void _showReviewDialog(int orderId) {
     final contentController = TextEditingController();
     double selectedRating = 5.0;
@@ -170,6 +160,7 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
     }
   }
 
+  // PHẦN LOGIC HỦY ĐƠN HÀNG
   Future<void> _handleCancelBooking(Map<String, dynamic> booking) async {
     final int orderId = booking['ORDER_ID'];
     final String status = booking['STATUS'] ?? 'UNKNOWN';
@@ -196,74 +187,95 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
     }
 
     if (apiStatusToCall == 'PAID_FULL') {
+      // Đảm bảo controller sạch sẽ hoặc giữ giá trị cũ nếu muốn
+      if (!_supportedBanks.contains(_bankNameController.text)) {
+        _bankNameController.clear();
+      }
+
       final refundInfoConfirmed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          backgroundColor: Colors.grey[900],
-          title: const Text('Thông tin hoàn tiền', style: TextStyle(color: Colors.white)),
-          content: Form(
-            key: _refundFormKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Để nhận lại tiền hoàn (nếu có theo chính sách), vui lòng cung cấp thông tin tài khoản ngân hàng của bạn:',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 15),
-                  TextFormField(
-                    controller: _bankAccountController,
-                    style: const TextStyle(color: Colors.white),
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Số tài khoản',
-                      labelStyle: const TextStyle(color: Colors.grey),
-                      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey[700]!)),
-                      focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF1CE88A))),
+        builder: (context) => StatefulBuilder( // Sử dụng StatefulBuilder để cập nhật UI Dropdown
+          builder: (context, setDialogState) => AlertDialog(
+            backgroundColor: Colors.grey[900],
+            title: const Text('Thông tin hoàn tiền', style: TextStyle(color: Colors.white)),
+            content: Form(
+              key: _refundFormKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Để nhận lại tiền hoàn (nếu có theo chính sách), vui lòng cung cấp thông tin tài khoản ngân hàng của bạn:',
+                      style: TextStyle(color: Colors.grey),
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) return 'Vui lòng nhập số tài khoản';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: _bankNameController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Tên ngân hàng',
-                      labelStyle: const TextStyle(color: Colors.grey),
-                      hintText: 'VD: Vietcombank, ACB...',
-                      hintStyle: TextStyle(color: Colors.grey[600]),
-                      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey[700]!)),
-                      focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF1CE88A))),
+                    const SizedBox(height: 15),
+                    TextFormField(
+                      controller: _bankAccountController,
+                      style: const TextStyle(color: Colors.white),
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Số tài khoản',
+                        labelStyle: const TextStyle(color: Colors.grey),
+                        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey[700]!)),
+                        focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF1CE88A))),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) return 'Vui lòng nhập số tài khoản';
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) return 'Vui lòng nhập tên ngân hàng';
-                      return null;
-                    },
-                  ),
-                ],
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      dropdownColor: Colors.grey[900],
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Tên ngân hàng',
+                        labelStyle: const TextStyle(color: Colors.grey),
+                        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey[700]!)),
+                        focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF1CE88A))),
+                      ),
+                      // Nếu giá trị hiện tại có trong danh sách thì hiển thị, ngược lại null
+                      value: _supportedBanks.contains(_bankNameController.text)
+                          ? _bankNameController.text
+                          : null,
+                      items: _supportedBanks.map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        // Cập nhật controller và UI dialog
+                        setDialogState(() {
+                          _bankNameController.text = newValue ?? '';
+                        });
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Vui lòng chọn ngân hàng';
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Hủy bỏ', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1CE88A)),
+                onPressed: () {
+                  if (_refundFormKey.currentState!.validate()) {
+                    Navigator.of(context).pop(true);
+                  }
+                },
+                child: const Text('Xác nhận thông tin', style: TextStyle(color: Colors.black)),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Hủy bỏ', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1CE88A)),
-              onPressed: () {
-                if (_refundFormKey.currentState!.validate()) {
-                  Navigator.of(context).pop(true);
-                }
-              },
-              child: const Text('Xác nhận thông tin', style: TextStyle(color: Colors.black)),
-            ),
-          ],
         ),
       );
 

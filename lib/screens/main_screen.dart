@@ -3,7 +3,6 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile/providers/home_provider.dart';
 import 'package:mobile/providers/car_provider.dart';
-
 import 'package:mobile/screens/home_screen.dart';
 import 'package:mobile/screens/car_list_screen.dart';
 import 'package:mobile/screens/my_booking_screen.dart';

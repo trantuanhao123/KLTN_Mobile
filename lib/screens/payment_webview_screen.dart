@@ -22,7 +22,6 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (int progress) {
-            // Cập nhật thanh tải (nếu có)
           },
           onPageStarted: (String url) {
             setState(() {
@@ -34,7 +33,6 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
             setState(() => _isLoading = false);
           },
 
-          // SỬA ĐỔI QUAN TRỌNG Ở ĐÂY
           onUrlChange: (UrlChange change) {
             final newUrl = change.url;
             if (newUrl != null && newUrl.contains('payment-result')) {
