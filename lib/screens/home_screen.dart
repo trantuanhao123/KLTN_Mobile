@@ -26,7 +26,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    LocalNotificationHelper.initialize();
+    LocalNotificationHelper.initialize((details) {
+      // Điều hướng sang màn hình NotificationScreen
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const NotificationScreen()),
+      );
+    });
     _startNotificationPolling();
   }
 
@@ -562,7 +568,8 @@ class _HomeScreenState extends State<HomeScreen> {
 class LocalNotificationHelper {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
 
-  static Future<void> initialize() async {
+  // 1. Thêm tham số onNotificationTap vào hàm initialize
+  static Future<void> initialize(Function(NotificationResponse) onNotificationTap) async {
     const AndroidInitializationSettings initializationSettingsAndroid =
     AndroidInitializationSettings('@mipmap/ic_launcher');
 
@@ -573,7 +580,11 @@ class LocalNotificationHelper {
       iOS: initializationSettingsDarwin,
     );
 
-    await _notificationsPlugin.initialize(initializationSettings);
+    // 2. Thêm tham số onDidReceiveNotificationResponse
+    await _notificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: onNotificationTap,
+    );
 
     if (Platform.isAndroid) {
       await _notificationsPlugin
