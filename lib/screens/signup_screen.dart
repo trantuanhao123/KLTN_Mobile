@@ -199,14 +199,6 @@ class _SignupScreenState extends State<SignupScreen> {
                     // TODO: Implement Google Sign up
                   },
                 ),
-                const SizedBox(height: 16),
-                _buildSocialButton(
-                  icon: const FaIcon(FontAwesomeIcons.facebook, color: Color(0xFF1877F2), size: 28),
-                  text: 'Đăng ký với Facebook',
-                  onPressed: () {
-                    // TODO: Implement Facebook Sign up
-                  },
-                ),
                 const SizedBox(height: 48),
 
                 Align(

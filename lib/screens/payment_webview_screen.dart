@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:mobile/api/api_service.dart'; // Import API service
 
 class PaymentWebViewScreen extends StatefulWidget {
   final String url;
-  const PaymentWebViewScreen({super.key, required this.url});
+  final int orderId; // [THÊM] Nhận Order ID để hủy
+
+  const PaymentWebViewScreen({
+    super.key,
+    required this.url,
+    required this.orderId,
+  });
 
   @override
   State<PaymentWebViewScreen> createState() => _PaymentWebViewScreenState();
@@ -11,8 +18,7 @@ class PaymentWebViewScreen extends StatefulWidget {
 
 class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
   late final WebViewController _controller;
-  bool _isLoading = true;
-  String? _error;
+  bool _isHandle = false;
 
   @override
   void initState() {
@@ -21,83 +27,103 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onProgress: (int progress) {
+          onNavigationRequest: (NavigationRequest request) {
+            if (_checkResultUrl(request.url)) {
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
           },
           onPageStarted: (String url) {
-            setState(() {
-              _isLoading = true;
-              _error = null;
-            });
-          },
-          onPageFinished: (String url) {
-            setState(() => _isLoading = false);
-          },
-
-          onUrlChange: (UrlChange change) {
-            final newUrl = change.url;
-            if (newUrl != null && newUrl.contains('payment-result')) {
-              // Phân tích URL để lấy các tham số query
-              final uri = Uri.parse(newUrl);
-
-              final isCancelled = uri.queryParameters['cancel']; // 'true' hoặc null
-              final status = uri.queryParameters['status'];     // 'PAID', 'CANCELLED', 'FAILED'
-
-              print('PayOS Redirect URL: $newUrl'); // Dành cho debug
-              print('PayOS Status: $status, Cancel: $isCancelled');
-
-              if (isCancelled == 'true') {
-                // Trường hợp 1: Người dùng nhấn "Hủy"
-                Navigator.pop(context, 'cancelled');
-              } else if (status == 'PAID') {
-                // Trường hợp 2: Thanh toán thành công
-                Navigator.pop(context, 'success');
-              } else if (status == 'CANCELLED' || status == 'FAILED') {
-                // Trường hợp 3: Thanh toán thất bại (hết hạn, từ chối...)
-                Navigator.pop(context, 'error');
-              }
-              // Nếu không phải 3 trường hợp trên, WebView sẽ tiếp tục tải trang
-            }
-          },
-
-          onWebResourceError: (WebResourceError error) {
-            setState(() {
-              _isLoading = false;
-              _error = "Lỗi tải trang: ${error.description}";
-            });
+            _checkResultUrl(url);
           },
         ),
       )
       ..loadRequest(Uri.parse(widget.url));
   }
 
+  // Hàm xử lý gọi API hủy đơn hàng
+  Future<void> _cancelOrderAndPop() async {
+    if (_isHandle) return;
+    _isHandle = true;
+
+    // Hiển thị loading nhẹ
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const Center(child: CircularProgressIndicator(color: Color(0xFF1CE88A))),
+    );
+
+    try {
+      final apiService = ApiService();
+      // Gọi API hủy đơn với trạng thái 'PENDING'
+      // Hàm này dựa trên logic trong MyBookingScreen của bạn
+      await apiService.cancelOrder(widget.orderId, 'PENDING');
+      print("Đã gọi API hủy đơn hàng ${widget.orderId} thành công");
+    } catch (e) {
+      print("Lỗi khi gọi API hủy: $e");
+      // Dù lỗi API hay không thì cũng vẫn đóng màn hình thanh toán
+    } finally {
+      Navigator.of(context).pop(); // Đóng loading dialog
+      Navigator.of(context).pop('cancelled'); // Đóng màn hình thanh toán trả về cancelled
+    }
+  }
+
+  bool _checkResultUrl(String url) {
+    if (_isHandle) return true;
+
+    final uri = Uri.parse(url);
+
+    if (url.contains('/result') || uri.queryParameters['status'] == 'PAID') {
+
+      // TRƯỜNG HỢP 1: Bấm nút "Hủy" trên giao diện PayOS
+      if (uri.queryParameters['cancel'] == 'true' ||
+          uri.queryParameters['status'] == 'CANCELLED') {
+        _cancelOrderAndPop(); // Gọi hàm hủy
+        return true;
+      }
+
+      // TRƯỜNG HỢP 2: Thanh toán thành công
+      if (uri.queryParameters['code'] == '00' ||
+          uri.queryParameters['status'] == 'PAID' ||
+          uri.queryParameters['id'] != null) {
+        _isHandle = true;
+        Navigator.pop(context, 'success');
+        return true;
+      }
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Thanh toán', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('Thanh toán PayOS', style: TextStyle(color: Colors.black)),
+        backgroundColor: Colors.white,
+        elevation: 1,
+        iconTheme: const IconThemeData(color: Colors.black),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () {
+            // TRƯỜNG HỢP 3: Bấm nút "X" trên App Bar
             showDialog(
               context: context,
               builder: (context) => AlertDialog(
                 backgroundColor: Colors.grey[900],
-                title: Text('Hủy thanh toán?', style: TextStyle(color: Colors.white)),
-                content: Text('Bạn có chắc chắn muốn hủy giao dịch này?', style: TextStyle(color: Colors.grey)),
+                title: const Text('Hủy thanh toán?', style: TextStyle(color: Colors.white)),
+                content: const Text('Giao dịch sẽ bị hủy và xe sẽ được mở lại cho người khác.', style: TextStyle(color: Colors.grey)),
                 actions: [
                   TextButton(
-                    onPressed: () => Navigator.pop(context), // Đóng dialog
-                    child: Text('Không', style: TextStyle(color: Colors.grey)),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Tiếp tục thanh toán', style: TextStyle(color: Colors.white)),
                   ),
                   TextButton(
                     onPressed: () {
                       Navigator.pop(context); // Đóng dialog
-                      Navigator.pop(context, 'cancelled'); // Quay về màn hình trước
+                      _cancelOrderAndPop(); // Gọi hàm hủy đơn + đóng webview
                     },
-                    child: Text('Đồng ý Hủy', style: TextStyle(color: Colors.orange)),
+                    child: const Text('Hủy đơn', style: TextStyle(color: Colors.red)),
                   ),
                 ],
               ),
@@ -105,21 +131,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
           },
         ),
       ),
-      body: Stack(
-        children: [
-          if (_error != null)
-            Center(
-              child: Text(_error!, style: const TextStyle(color: Colors.red)),
-            )
-          else
-            WebViewWidget(controller: _controller),
-
-          if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(color: Color(0xFF1CE88A)),
-            ),
-        ],
-      ),
+      body: WebViewWidget(controller: _controller),
     );
   }
 }

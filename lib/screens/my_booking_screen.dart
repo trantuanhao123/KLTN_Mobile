@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile/api/api_service.dart';
+import 'package:mobile/screens/report_incident_screen.dart'; // ĐỔI ĐƯỜNG DẪN NÀY CHO ĐÚNG VỚI PROJECT CỦA BẠN
 
 class MyBookingScreen extends StatefulWidget {
   const MyBookingScreen({super.key});
@@ -17,7 +18,6 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
   final _bankNameController = TextEditingController();
   final _refundFormKey = GlobalKey<FormState>();
 
-  // Danh sách ngân hàng hỗ trợ
   final List<String> _supportedBanks = [
     'Vietcombank',
     'BIDV',
@@ -75,7 +75,7 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
     });
   }
 
-  // PHẦN LOGIC ĐÁNH GIÁ
+  // ===================== ĐÁNH GIÁ =====================
   void _showReviewDialog(int orderId) {
     final contentController = TextEditingController();
     double selectedRating = 5.0;
@@ -160,8 +160,9 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
     }
   }
 
-  // PHẦN LOGIC HỦY ĐƠN HÀNG
+  // ===================== HỦY ĐƠN =====================
   Future<void> _handleCancelBooking(Map<String, dynamic> booking) async {
+    // Đoạn code hủy đơn giữ nguyên 100% như file cũ của bạn
     final int orderId = booking['ORDER_ID'];
     final String status = booking['STATUS'] ?? 'UNKNOWN';
     final String paymentStatus = (booking['PAYMENT_STATUS'] ?? 'unknown').toLowerCase();
@@ -187,7 +188,6 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
     }
 
     if (apiStatusToCall == 'PAID_FULL') {
-      // Đảm bảo controller sạch sẽ hoặc giữ giá trị cũ nếu muốn
       if (!_supportedBanks.contains(_bankNameController.text)) {
         _bankNameController.clear();
       }
@@ -195,7 +195,7 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
       final refundInfoConfirmed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => StatefulBuilder( // Sử dụng StatefulBuilder để cập nhật UI Dropdown
+        builder: (context) => StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
             backgroundColor: Colors.grey[900],
             title: const Text('Thông tin hoàn tiền', style: TextStyle(color: Colors.white)),
@@ -235,7 +235,6 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
                         enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey[700]!)),
                         focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF1CE88A))),
                       ),
-                      // Nếu giá trị hiện tại có trong danh sách thì hiển thị, ngược lại null
                       value: _supportedBanks.contains(_bankNameController.text)
                           ? _bankNameController.text
                           : null,
@@ -246,7 +245,6 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
                         );
                       }).toList(),
                       onChanged: (String? newValue) {
-                        // Cập nhật controller và UI dialog
                         setDialogState(() {
                           _bankNameController.text = newValue ?? '';
                         });
@@ -334,6 +332,7 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
     }
   }
 
+  // ===================== ĐỔI LỊCH =====================
   Future<Map<String, String>?> _selectNewDayModeDateRange(DateTime currentStartDate) async {
     final now = DateTime.now();
     final firstSelectableDate = now.isBefore(currentStartDate) ? currentStartDate : now;
@@ -615,6 +614,7 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
     );
   }
 
+  // ===================== CARD ĐƠN HÀNG - ĐÃ THÊM NÚT BÁO SỰ CỐ =====================
   Widget _buildBookingCard(Map<String, dynamic> booking) {
     try {
       final car = booking['Car'] ?? {};
@@ -657,6 +657,9 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
       bool canChangeDate = (status == 'CONFIRMED') && isFuture;
       final bool hasReviewed = booking['review'] != null;
       final bool canReview = (status == 'COMPLETED') && !hasReviewed;
+
+      // THÊM DÒNG NÀY - CHỈ HIỆN NÚT KHI ĐANG THUÊ
+      final bool canReport = status == 'IN_PROGRESS';
 
       return Card(
         color: Colors.grey[900],
@@ -718,17 +721,21 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
                 ],
               ),
 
-              if (canCancel || canChangeDate || canReview)
+              // PHẦN NÚT - ĐÃ THAY ĐỔI THEO YÊU CẦU
+              if (canCancel || canChangeDate || canReview || canReport)
                 Padding(
                   padding: const EdgeInsets.only(top: 16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                  child: Wrap(
+                    spacing: 8.0,
+                    runSpacing: 4.0,
+                    alignment: WrapAlignment.end,
                     children: [
                       if (canChangeDate)
                         TextButton(
                           onPressed: () => _handleChangeDate(booking['ORDER_ID'], startDate, rentalType),
                           child: const Text('Đổi lịch', style: TextStyle(color: Color(0xFF1CE88A))),
                         ),
+
                       if (canReview)
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
@@ -740,7 +747,38 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
                           label: const Text('Đánh giá', style: TextStyle(color: Colors.white, fontSize: 13)),
                           onPressed: () => _showReviewDialog(booking['ORDER_ID']),
                         ),
-                      const SizedBox(width: 8),
+
+                      // NÚT BÁO SỰ CỐ MỚI
+                      if (canReport)
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange[800],
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                          icon: const Icon(Icons.warning_amber_rounded, size: 16, color: Colors.white),
+                          label: const Text('Báo sự cố', style: TextStyle(color: Colors.white, fontSize: 13)),
+                          onPressed: () {
+                            // [QUAN TRỌNG] Khai báo biến carId ở đây để sửa lỗi "Undefined name"
+                            int carId = 0;
+                            if (booking['Car'] != null && booking['Car']['CAR_ID'] != null) {
+                              carId = int.parse(booking['Car']['CAR_ID'].toString());
+                            } else if (booking['CAR_ID'] != null) {
+                              carId = int.parse(booking['CAR_ID'].toString());
+                            }
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ReportIncidentScreen(
+                                  orderId: booking['ORDER_ID'],
+                                  carId: carId, // Truyền biến vừa khai báo vào đây
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+
                       if (canCancel)
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
@@ -754,6 +792,7 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
                     ],
                   ),
                 ),
+
               if (status == 'COMPLETED' && hasReviewed)
                 Padding(
                   padding: const EdgeInsets.only(top: 12.0),
@@ -829,7 +868,7 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
         chipColor = Colors.teal;
         statusText = 'Đang thuê';
         break;
-      case 'COMPLETED':
+      case 'COMPLTED':
         chipColor = Colors.grey[600]!;
         statusText = 'Hoàn thành';
         break;

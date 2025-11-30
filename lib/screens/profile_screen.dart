@@ -14,13 +14,19 @@ class ProfileScreen extends StatelessWidget {
       builder: (context, userProvider, child) {
         final user = userProvider.user;
 
-        // Logic hiển thị Avatar (Server -> Default -> Icon)
-        final String? avatarUrl = user?['AVATAR_URL'];
+        // [ĐÃ SỬA] Logic hiển thị Avatar đồng bộ và xử lý đường dẫn đúng
         ImageProvider? avatarProvider;
-        if (avatarUrl != null && !avatarUrl.contains('default-avatar')) {
-          avatarProvider = NetworkImage("${ApiService().baseUrl}/images/$avatarUrl");
+        final String? avatarUrl = user?['AVATAR_URL'];
+
+        if (avatarUrl != null && avatarUrl.isNotEmpty && !avatarUrl.contains('default-avatar')) {
+          // Kiểm tra xem link có http chưa, nếu chưa thì nối thêm baseUrl
+          String finalUrl = avatarUrl.startsWith('http')
+              ? avatarUrl
+              : "${ApiService().baseUrl}/images/$avatarUrl";
+          avatarProvider = NetworkImage(finalUrl);
         } else {
-          avatarProvider = const AssetImage('assets/images/default-avatar.png');
+          // [ĐÃ SỬA] Đường dẫn đúng là assets/default-avatar.png (không có thư mục images con)
+          avatarProvider = const AssetImage('assets/default-avatar.png');
         }
 
         final bool isVerified = (user?['VERIFIED'] == 1 || user?['VERIFIED'] == true);
@@ -63,13 +69,17 @@ class ProfileScreen extends StatelessWidget {
               children: [
                 // --- PHẦN 1: THÔNG TIN USER ---
                 Center(
-                  child: CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.grey.shade800,
-                    backgroundImage: avatarProvider,
-                    child: avatarProvider == null
-                        ? const Icon(Icons.person, size: 50, color: Colors.white70)
-                        : null,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF1CE88A), width: 2), // Thêm viền xanh cho đẹp
+                    ),
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.grey.shade800,
+                      backgroundImage: avatarProvider,
+                      // Không cần child icon nữa vì đã có ảnh mặc định assets
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -146,7 +156,7 @@ class ProfileScreen extends StatelessWidget {
                       : 'Chưa cập nhật',
                 ),
 
-                // --- PHẦN 2: [THÊM MỚI] LIÊN HỆ HỖ TRỢ ---
+                // --- PHẦN 2: LIÊN HỆ HỖ TRỢ (Giữ nguyên code cũ của bạn) ---
                 const Padding(
                   padding: EdgeInsets.only(top: 24.0, bottom: 8.0),
                   child: Divider(color: Colors.white24),

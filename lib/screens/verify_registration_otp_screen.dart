@@ -137,15 +137,26 @@ class _VerifyRegistrationOtpScreenState extends State<VerifyRegistrationOtpScree
               ),
               const SizedBox(height: 20),
               TextButton(
-                onPressed: _isLoading ? null : () {
-                  // TODO: Implement resend OTP logic if needed
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Chức năng gửi lại OTP chưa được cài đặt.'), backgroundColor: Colors.orange),
-                  );
+                onPressed: _isLoading
+                    ? null
+                    : () async {
+                  setState(() => _isLoading = true);
+                  try {
+                    await ApiService().resendRegistrationOtp(widget.email);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Đã gửi lại mã OTP! Kiểm tra email.'), backgroundColor: Colors.green),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Lỗi: ${e.toString().replaceAll("Exception: ", "")}'), backgroundColor: Colors.red),
+                    );
+                  } finally {
+                    if (mounted) setState(() => _isLoading = false);
+                  }
                 },
                 child: Text(
                   'Chưa nhận được mã? Gửi lại',
-                  style: TextStyle(color: Colors.grey[400]),
+                  style: TextStyle(color: Colors.grey[400], decoration: TextDecoration.underline),
                 ),
               ),
             ],

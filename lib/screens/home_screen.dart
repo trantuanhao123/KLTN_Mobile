@@ -224,7 +224,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ==================== WIDGET BANNER MỚI DÙNG CAROUSEL ====================
   Widget _buildBannerList(List<dynamic> banners) {
     if (banners.isEmpty) {
       return Container(
@@ -359,10 +358,19 @@ class _HomeScreenState extends State<HomeScreen> {
     return Consumer2<UserProvider, HomeProvider>(
       builder: (context, userProvider, homeProvider, child) {
         final user = userProvider.user;
-        final avatarUrl = user?['AVATAR_URL'];
-        final fullAvatarUrl = avatarUrl != null
-            ? "${ApiService().baseUrl}/images/$avatarUrl"
-            : null;
+
+        // [ĐÃ SỬA] Logic hiển thị Avatar nhỏ ở Home
+        ImageProvider? avatarProvider;
+        final String? avatarUrl = user?['AVATAR_URL'];
+
+        if (avatarUrl != null && avatarUrl.isNotEmpty && !avatarUrl.contains('default-avatar')) {
+          String finalUrl = avatarUrl.startsWith('http')
+              ? avatarUrl
+              : "${ApiService().baseUrl}/images/$avatarUrl";
+          avatarProvider = NetworkImage(finalUrl);
+        } else {
+          avatarProvider = const AssetImage('assets/default-avatar.png'); // Ảnh mặc định đúng
+        }
 
         return Scaffold(
           backgroundColor: Colors.black,
@@ -374,10 +382,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 CircleAvatar(
                   radius: 20,
                   backgroundColor: Colors.grey.shade800,
-                  backgroundImage: fullAvatarUrl != null ? NetworkImage(fullAvatarUrl) : null,
-                  child: fullAvatarUrl == null
-                      ? const Icon(Icons.person_outline, color: Colors.white70, size: 20)
-                      : null,
+                  backgroundImage: avatarProvider, // Dùng provider đã xử lý
+                  // Bỏ child icon vì đã có asset
                 ),
                 const SizedBox(width: 12),
                 Column(
@@ -418,7 +424,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 10),
-                  // BANNER MỚI ĐÃ THAY THẾ
+                  // BANNER
                   _buildBannerList(homeProvider.banners),
                   const SizedBox(height: 24),
 
@@ -442,7 +448,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Các hàm UI khác
+  // Các hàm UI khác giữ nguyên
   Widget _buildSectionHeader(BuildContext context, String title, VoidCallback onViewAll) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -552,7 +558,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// LocalNotificationHelper giữ nguyên như cũ
+// LocalNotificationHelper giữ nguyên
 class LocalNotificationHelper {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
 

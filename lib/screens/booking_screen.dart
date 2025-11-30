@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile/api/api_service.dart';
 import 'package:mobile/screens/payment_webview_screen.dart';
+import 'package:mobile/screens/my_booking_screen.dart';
 // import 'package:url_launcher/url_launcher.dart';
 
 enum RentalMode { day, hour }
@@ -455,17 +456,26 @@ Chi phí Phát sinh & Bồi thường
 
       final codeToSubmit = _discountCodeController.text.trim().toUpperCase();
 
-      final paymentUrl = await apiService.createOrderAndGetPaymentLink(
+      final resultData = await apiService.createOrderAndGetPaymentLink(
         carId: widget.car['CAR_ID'],
         startDate: startDateFormatted,
         endDate: endDateFormatted,
         paymentOption: _paymentOption,
-        discountCode: codeToSubmit, // Gửi mã từ controller
+        discountCode: codeToSubmit,
         rentalType: rentalTypeParam,
       );
 
+      final paymentUrl = resultData['url'];
+      final int orderId = int.parse(resultData['orderId'].toString());
+
+      // Truyền orderId sang màn hình thanh toán
       final result = await navigator.push(
-        MaterialPageRoute(builder: (context) => PaymentWebViewScreen(url: paymentUrl)),
+        MaterialPageRoute(
+          builder: (context) => PaymentWebViewScreen(
+              url: paymentUrl,
+              orderId: orderId
+          ),
+        ),
       );
 
       if (!mounted) return;
@@ -474,7 +484,10 @@ Chi phí Phát sinh & Bồi thường
         scaffoldMessenger.showSnackBar(
           const SnackBar(content: Text('Đặt xe và thanh toán thành công!'), backgroundColor: Colors.green),
         );
-        navigator.popUntil((route) => route.isFirst);
+        navigator.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const MyBookingScreen()),
+              (route) => route.isFirst,
+        );
       } else if (result == 'cancelled') {
         scaffoldMessenger.showSnackBar(
           const SnackBar(content: Text('Bạn đã hủy thanh toán.'), backgroundColor: Colors.orange),

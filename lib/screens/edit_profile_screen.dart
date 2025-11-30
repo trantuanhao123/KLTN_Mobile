@@ -87,6 +87,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       initialDate: initialDate,
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
+      builder: (context, child) { // Thêm theme tối cho lịch
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFF1CE88A),
+              onPrimary: Colors.black,
+              surface: Colors.grey,
+              onSurface: Colors.white,
+            ),
+            dialogBackgroundColor: Colors.grey[900],
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (picked != null) {
@@ -301,11 +315,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     final user = Provider.of<UserProvider>(context).user;
 
-    // Xử lý hiển thị Avatar
+    // [ĐÃ SỬA] Logic hiển thị Avatar đồng bộ với ProfileScreen
     final avatarUrl = user?['AVATAR_URL'];
-    final fullAvatarUrl = avatarUrl != null
-        ? "${ApiService().baseUrl}/images/$avatarUrl"
-        : null;
+    ImageProvider? bgImage;
+
+    if (_avatarImage != null) {
+      bgImage = FileImage(_avatarImage!);
+    } else if (avatarUrl != null && avatarUrl.toString().isNotEmpty && !avatarUrl.toString().contains('default-avatar')) {
+      String finalUrl = avatarUrl.toString().startsWith('http')
+          ? avatarUrl
+          : "${ApiService().baseUrl}/images/$avatarUrl";
+      bgImage = NetworkImage(finalUrl);
+    } else {
+      bgImage = const AssetImage('assets/default-avatar.png');
+    }
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -329,17 +352,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   CircleAvatar(
                     radius: 50,
                     backgroundColor: Colors.grey.shade800,
-                    // Ưu tiên hiển thị ảnh mới chọn, sau đó đến ảnh từ server
-                    backgroundImage: _avatarImage != null
-                        ? FileImage(_avatarImage!)
-                        : (fullAvatarUrl != null
-                        ? NetworkImage(fullAvatarUrl)
-                        : null) as ImageProvider?,
-                    // Nếu không có ảnh nào thì hiện icon
-                    child: (fullAvatarUrl == null && _avatarImage == null)
-                        ? const Icon(Icons.person,
-                        size: 50, color: Colors.white70)
-                        : null,
+                    backgroundImage: bgImage,
+                    // Bỏ icon fallback vì đã có ảnh asset mặc định
                   ),
                   Positioned(
                     bottom: 0,
