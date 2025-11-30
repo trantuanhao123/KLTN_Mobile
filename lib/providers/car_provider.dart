@@ -32,13 +32,43 @@ class CarProvider with ChangeNotifier {
         _apiService.getCategories(),
         _apiService.getBranches(),
       ]);
-      //Lọc chỉ lấy xe có STATUS là 'AVAILABLE'
-      var rawCars = results[0];
-      if (rawCars is List) {
-        rawCars = rawCars.where((car) => car['STATUS'] == 'AVAILABLE').toList();
+
+      // 1. Lọc lấy xe AVAILABLE
+      var rawList = results[0];
+      if (rawList is List) {
+        _allCars = rawList.where((car) => car['STATUS'] == 'AVAILABLE').toList();
+      } else {
+        _allCars = [];
       }
-      // Xử lý chuẩn hóa dữ liệu xe
-      _allCars = results[0].map((car) {
+
+      // 2. [MỚI] Tự động tải rating cho từng xe (Fix lỗi hiển thị sai)
+      // Sử dụng Future.wait để tải song song cho nhanh
+      await Future.wait(_allCars.map((car) async {
+        try {
+          int carId = car['CAR_ID'] ?? car['car_id'] ?? car['id'];
+          // Gọi API lấy review giống hệt màn hình chi tiết
+          final reviews = await _apiService.getReviewsByCarId(carId);
+
+          if (reviews.isNotEmpty) {
+            // Tự tính trung bình cộng
+            double total = 0;
+            for (var r in reviews) {
+              total += double.tryParse(r['RATING']?.toString() ?? '0') ?? 0;
+            }
+            car['calculated_rating'] = total / reviews.length;
+            car['review_count'] = reviews.length;
+          } else {
+            car['calculated_rating'] = 0.0;
+            car['review_count'] = 0;
+          }
+        } catch (e) {
+          print("Lỗi tính rating xe: $e");
+          car['calculated_rating'] = 0.0;
+        }
+      }));
+
+      // 3. Xử lý ảnh
+      _allCars = _allCars.map((car) {
         car['image'] = car['mainImageUrl'] ?? car['IMAGE_URL'] ?? car['imageUrl'] ?? '';
         car['thumbnail'] = car['mainImageUrl'] ?? car['imageUrl'] ?? '';
         return car;

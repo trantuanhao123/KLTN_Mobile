@@ -324,8 +324,17 @@ class _CarListScreenState extends State<CarListScreen> {
                       final fullCarImageUrl = imageUrl != null ? "$baseUrl/images/$imageUrl" : null;
                       final pricePerDay = double.tryParse(car['PRICE_PER_DAY']?.toString() ?? '0') ?? 0.0;
 
-                      // Lấy điểm đánh giá – nếu null thì mặc định 5.0
-                      final double rating = double.tryParse(car['RATING']?.toString() ?? '5.0') ?? 5.0;
+                      // Lấy rating và số lượt đánh giá (ưu tiên calculated_rating)
+                      final double rating = double.tryParse(
+                        car['calculated_rating']?.toString() ??
+                            car['RATING']?.toString() ??
+                            car['rating']?.toString() ??
+                            '0',
+                      ) ?? 0.0;
+
+                      final int reviewCount = car['review_count'] is int
+                          ? car['review_count']
+                          : int.tryParse(car['review_count']?.toString() ?? '0') ?? 0;
 
                       return GestureDetector(
                         onTap: () {
@@ -374,19 +383,37 @@ class _CarListScreenState extends State<CarListScreen> {
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
+                                        // Giá tiền
                                         Text(
                                           "${priceFormat.format(pricePerDay)}/ngày",
-                                          style: const TextStyle(color: Color(0xFF1CE88A), fontSize: 12, fontWeight: FontWeight.w600),
+                                          style: const TextStyle(
+                                            color: Color(0xFF1CE88A),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.star, color: Colors.amber, size: 15),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              rating.toStringAsFixed(1),
-                                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
-                                            ),
-                                          ],
+                                        const SizedBox(width: 0.5),
+                                        Text(
+                                          rating.toStringAsFixed(1),
+                                          style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold
+                                          ),
+                                        ),
+                                        Flexible(
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              // Icon sao: vàng nếu có đánh giá, xám nếu chưa có
+                                              Icon(
+                                                Icons.star,
+                                                color: rating > 0 ? Colors.amber : Colors.grey[600],
+                                                size: 14,
+                                              ),
+                                              const SizedBox(width: 4),
+                                            ],
+                                          ),
                                         ),
                                       ],
                                     ),
