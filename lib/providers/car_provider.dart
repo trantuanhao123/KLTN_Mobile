@@ -32,7 +32,11 @@ class CarProvider with ChangeNotifier {
         _apiService.getCategories(),
         _apiService.getBranches(),
       ]);
-
+      //Lọc chỉ lấy xe có STATUS là 'AVAILABLE'
+      var rawCars = results[0];
+      if (rawCars is List) {
+        rawCars = rawCars.where((car) => car['STATUS'] == 'AVAILABLE').toList();
+      }
       // Xử lý chuẩn hóa dữ liệu xe
       _allCars = results[0].map((car) {
         car['image'] = car['mainImageUrl'] ?? car['IMAGE_URL'] ?? car['imageUrl'] ?? '';

@@ -40,9 +40,14 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
-    await _apiService.logout();
-    _isAuthenticated = false;
-    notifyListeners();
+    try {
+      await _apiService.logout();
+    } catch (e) {
+      print("Lỗi logout API: $e");
+    } finally {
+      _isAuthenticated = false;
+      notifyListeners();
+    }
   }
 
   void forceLogin() {

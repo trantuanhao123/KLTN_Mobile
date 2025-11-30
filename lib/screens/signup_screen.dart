@@ -192,13 +192,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ],
                 ),
                 const SizedBox(height: 32),
-                _buildSocialButton(
-                  icon: Image.asset('assets/google_logo.png', height: 24),
-                  text: 'Đăng ký với Google',
-                  onPressed: () {
-                    // TODO: Implement Google Sign up
-                  },
-                ),
+
                 const SizedBox(height: 48),
 
                 Align(

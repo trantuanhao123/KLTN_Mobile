@@ -19,12 +19,12 @@ class _CarListScreenState extends State<CarListScreen> {
   String? _selectedBrand;
   int? _selectedCategoryId;
   int? _selectedBranchId;
-  RangeValues _currentPriceRange = const RangeValues(0, 5000000);
+  RangeValues _currentPriceRange = const RangeValues(0, 10000000);
 
   String? _modalSelectedBrand;
   int? _modalSelectedCategoryId;
   int? _modalSelectedBranchId;
-  RangeValues _modalPriceRange = const RangeValues(0, 5000000);
+  RangeValues _modalPriceRange = const RangeValues(0, 10000000);
 
   @override
   void initState() {
@@ -172,13 +172,13 @@ class _CarListScreenState extends State<CarListScreen> {
                             _modalSelectedBrand = null;
                             _modalSelectedCategoryId = null;
                             _modalSelectedBranchId = null;
-                            _modalPriceRange = const RangeValues(0, 5000000);
+                            _modalPriceRange = const RangeValues(0, 10000000);
                           });
                           setState(() {
                             _selectedBrand = null;
                             _selectedCategoryId = null;
                             _selectedBranchId = null;
-                            _currentPriceRange = const RangeValues(0, 5000000);
+                            _currentPriceRange = const RangeValues(0, 10000000);
                             _searchController.clear();
                           });
                           carProvider.applyFilters();
