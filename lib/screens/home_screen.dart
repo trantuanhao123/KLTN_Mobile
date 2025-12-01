@@ -11,6 +11,7 @@ import 'package:mobile/screens/car_list_screen.dart';
 import 'package:mobile/screens/car_detail_screen.dart';
 import 'package:mobile/screens/notification_screen.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:cached_network_image/cached_network_image.dart'; // Đã import thư viện này
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -76,6 +77,13 @@ class _HomeScreenState extends State<HomeScreen> {
   // ==================== HÀM HIỆN POPUP KHI NHẤN BANNER ====================
   void _showBannerInfo(BuildContext context, Map<String, dynamic> banner) {
     final apiService = ApiService();
+    // Xử lý URL ảnh
+    String? imageUrl;
+    if (banner['IMAGE_URL'] != null) {
+      imageUrl = banner['IMAGE_URL'].toString().startsWith('http')
+          ? banner['IMAGE_URL']
+          : "${apiService.baseUrl}/images/${banner['IMAGE_URL']}";
+    }
 
     showDialog(
       context: context,
@@ -95,17 +103,21 @@ class _HomeScreenState extends State<HomeScreen> {
               // Ảnh banner + nút đóng
               Stack(
                 children: [
-                  if (banner['IMAGE_URL'] != null)
+                  if (imageUrl != null)
                     ClipRRect(
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                      child: Image.network(
-                        banner['IMAGE_URL'].toString().startsWith('http')
-                            ? banner['IMAGE_URL']
-                            : "${apiService.baseUrl}/images/${banner['IMAGE_URL']}",
+                      // Dùng CachedNetworkImage cho Popup
+                      child: CachedNetworkImage(
+                        imageUrl: imageUrl,
                         height: 220,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        placeholder: (context, url) => Container(
+                          height: 220,
+                          color: Colors.grey[800],
+                          child: const Center(child: CircularProgressIndicator(color: Color(0xFF1CE88A))),
+                        ),
+                        errorWidget: (context, url, error) => Container(
                           height: 220,
                           color: Colors.grey[800],
                           child: const Icon(Icons.image_not_supported, color: Colors.grey, size: 60),
@@ -281,29 +293,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 fit: StackFit.expand,
                 children: [
                   if (imageUrl.isNotEmpty)
-                    Image.network(
-                      imageUrl,
+                  // Dùng CachedNetworkImage cho Carousel
+                    CachedNetworkImage(
+                      imageUrl: imageUrl,
                       fit: BoxFit.cover,
                       width: double.infinity,
                       height: double.infinity,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Container(
-                          color: Colors.grey[800],
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              color: Color(0xFF1CE88A),
-                              strokeWidth: 2,
-                            ),
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[800],
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF1CE88A),
+                            strokeWidth: 2,
                           ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[800],
-                          child: const Icon(Icons.broken_image, color: Colors.grey, size: 50),
-                        );
-                      },
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey[800],
+                        child: const Icon(Icons.broken_image, color: Colors.grey, size: 50),
+                      ),
                     )
                   else
                     Container(
@@ -365,17 +373,18 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, userProvider, homeProvider, child) {
         final user = userProvider.user;
 
-        // [ĐÃ SỬA] Logic hiển thị Avatar nhỏ ở Home
-        ImageProvider? avatarProvider;
+        // Logic hiển thị Avatar dùng CachedNetworkImageProvider
+        ImageProvider avatarProvider;
         final String? avatarUrl = user?['AVATAR_URL'];
 
         if (avatarUrl != null && avatarUrl.isNotEmpty && !avatarUrl.contains('default-avatar')) {
           String finalUrl = avatarUrl.startsWith('http')
               ? avatarUrl
               : "${ApiService().baseUrl}/images/$avatarUrl";
-          avatarProvider = NetworkImage(finalUrl);
+          // Dùng CachedNetworkImageProvider thay vì NetworkImage
+          avatarProvider = CachedNetworkImageProvider(finalUrl);
         } else {
-          avatarProvider = const AssetImage('assets/default-avatar.png'); // Ảnh mặc định đúng
+          avatarProvider = const AssetImage('assets/default-avatar.png');
         }
 
         return Scaffold(
@@ -388,8 +397,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 CircleAvatar(
                   radius: 20,
                   backgroundColor: Colors.grey.shade800,
-                  backgroundImage: avatarProvider, // Dùng provider đã xử lý
-                  // Bỏ child icon vì đã có asset
+                  backgroundImage: avatarProvider,
                 ),
                 const SizedBox(width: 12),
                 Column(
@@ -454,7 +462,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Các hàm UI khác giữ nguyên
+  // Các hàm UI khác
   Widget _buildSectionHeader(BuildContext context, String title, VoidCallback onViewAll) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -540,9 +548,27 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(
+                      // Dùng CachedNetworkImage cho Xe
                       child: fullCarImageUrl != null
-                          ? Image.network(fullCarImageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, color: Colors.grey, size: 40))
-                          : const Icon(Icons.directions_car, color: Colors.grey, size: 50),
+                          ? CachedNetworkImage(
+                        imageUrl: fullCarImageUrl,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        placeholder: (context, url) => Container(
+                          color: Colors.grey[800],
+                          child: const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1CE88A)),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.grey[800],
+                          child: const Icon(Icons.car_repair, color: Colors.grey, size: 50),
+                        ),
+                      )
+                          : Container(
+                        color: Colors.grey[800],
+                        child: const Icon(Icons.directions_car, color: Colors.grey, size: 50),
+                      ),
                     ),
                     Padding(
                       padding: const EdgeInsets.all(10.0),
@@ -568,7 +594,6 @@ class _HomeScreenState extends State<HomeScreen> {
 class LocalNotificationHelper {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
 
-  // 1. Thêm tham số onNotificationTap vào hàm initialize
   static Future<void> initialize(Function(NotificationResponse) onNotificationTap) async {
     const AndroidInitializationSettings initializationSettingsAndroid =
     AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -580,7 +605,6 @@ class LocalNotificationHelper {
       iOS: initializationSettingsDarwin,
     );
 
-    // 2. Thêm tham số onDidReceiveNotificationResponse
     await _notificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: onNotificationTap,

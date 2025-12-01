@@ -45,11 +45,6 @@ class _VerifyRegistrationOtpScreenState extends State<VerifyRegistrationOtpScree
         ),
       );
       navigator.popUntil((route) => route.isFirst);
-      // Điều hướng đến màn hình chính (xóa tất cả màn hình trước đó)
-      // navigator.pushAndRemoveUntil(
-      //   MaterialPageRoute(builder: (context) => const MainScreen()),
-      //       (Route<dynamic> route) => false, // Xóa tất cả route cũ
-      // );
 
     } catch (e) {
       scaffoldMessenger.showSnackBar(

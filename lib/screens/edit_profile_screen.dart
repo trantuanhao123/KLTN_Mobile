@@ -315,7 +315,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     final user = Provider.of<UserProvider>(context).user;
 
-    // [ĐÃ SỬA] Logic hiển thị Avatar đồng bộ với ProfileScreen
+    // Logic hiển thị Avatar đồng bộ với ProfileScreen
     final avatarUrl = user?['AVATAR_URL'];
     ImageProvider? bgImage;
 
@@ -353,7 +353,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     radius: 50,
                     backgroundColor: Colors.grey.shade800,
                     backgroundImage: bgImage,
-                    // Bỏ icon fallback vì đã có ảnh asset mặc định
                   ),
                   Positioned(
                     bottom: 0,
@@ -490,11 +489,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               borderRadius: BorderRadius.circular(8),
               child: imageFile != null
                   ? Image.file(imageFile,
-                  fit: BoxFit.contain) // Dùng contain để thấy toàn bộ
+                  fit: BoxFit.contain) 
                   : (networkUrl != null
                   ? Image.network(
                 "${ApiService().baseUrl}/images/$networkUrl",
-                fit: BoxFit.contain, // Dùng contain để thấy toàn bộ
+                fit: BoxFit.contain, 
                 errorBuilder: (context, error, stackTrace) =>
                 const Center(
                     child: Icon(Icons.broken_image,

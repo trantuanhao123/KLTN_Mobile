@@ -4,7 +4,7 @@ import 'package:mobile/api/api_service.dart'; // Import API service
 
 class PaymentWebViewScreen extends StatefulWidget {
   final String url;
-  final int orderId; // [THÊM] Nhận Order ID để hủy
+  final int orderId; // Nhận Order ID để hủy
 
   const PaymentWebViewScreen({
     super.key,
@@ -61,7 +61,6 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
       print("Đã gọi API hủy đơn hàng ${widget.orderId} thành công");
     } catch (e) {
       print("Lỗi khi gọi API hủy: $e");
-      // Dù lỗi API hay không thì cũng vẫn đóng màn hình thanh toán
     } finally {
       Navigator.of(context).pop(); // Đóng loading dialog
       Navigator.of(context).pop('cancelled'); // Đóng màn hình thanh toán trả về cancelled

@@ -245,7 +245,7 @@ class ApiService {
     }
   }
 
-  /// Hàm mới: Cập nhật bằng lái xe (Mặt trước + Mặt sau)
+  /// Hàm Cập nhật bằng lái xe (Mặt trước + Mặt sau)
   Future<void> updateLicense(String userId, String frontPath,
       String backPath) async {
     if (userId.isEmpty || frontPath.isEmpty ||
@@ -290,7 +290,7 @@ class ApiService {
     }
   }
 
-  /// Hàm mới: Đổi mật khẩu
+  /// Hàm Đổi mật khẩu
   Future<void> changePassword(String oldPassword, String newPassword) async {
     try {
       final response = await http.post(
@@ -340,6 +340,25 @@ class ApiService {
       return list.cast<Map<String, dynamic>>().toList();
     } catch (e) {
       throw Exception('Lỗi kết nối xe: ${e.toString()}');
+    }
+  }
+
+  Future<List<dynamic>> getCarImages(int carId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/car-image/$carId'),
+        headers: await _getHeaders(),
+      ).timeout(const Duration(seconds: _timeoutSeconds));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) return decoded;
+        return [];
+      }
+      return [];
+    } catch (e) {
+      print("Lỗi API lấy ảnh xe: $e");
+      return []; // Trả về rỗng để UI tự dùng ảnh mặc định
     }
   }
 
@@ -472,13 +491,9 @@ class ApiService {
       // Kiểm tra lỗi xác thực (401, token hết hạn, v.v.)
       _handleAuthError(response);
 
-      // PayOS thường trả 201, nhưng có thể backend wrap lại trả 200
       if (response.statusCode == 200 || response.statusCode == 201) {
         final Map<String, dynamic> data = jsonDecode(response.body);
-
-        // Một số backend trả thẳng object, một số lại bọc trong key "data"
         final payload = data['data'] ?? data;
-
         final String? checkoutUrl = payload['checkoutUrl'] as String?;
         final dynamic orderCode = payload['orderCode'] ?? payload['orderId'];
 
@@ -730,7 +745,7 @@ class ApiService {
   // ====================== Report Incident ======================
 
   Future<void> reportIncident(int orderId, int carId, String content, List<String> imagePaths) async {
-    final url = Uri.parse('$baseUrl/incident'); // URL chính xác (không có 's')
+    final url = Uri.parse('$baseUrl/incident');
     final token = await getToken();
 
     var request = http.MultipartRequest('POST', url);

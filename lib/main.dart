@@ -6,6 +6,8 @@ import 'package:mobile/providers/car_provider.dart';
 import 'package:mobile/providers/home_provider.dart';
 import 'package:mobile/screens/login_screen.dart';
 import 'package:mobile/screens/main_screen.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:mobile/screens/splash_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -28,13 +30,25 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'Car Rental App',
+        title: 'Thuê Xe Việt',
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('vi', 'VN'),
+        ],
+        locale: const Locale('vi', 'VN'),
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1CE88A), brightness: Brightness.dark),
           useMaterial3: true,
         ),
         home: Consumer<AuthProvider>(
           builder: (context, auth, child) {
+            if (auth.isLoading) {
+              return const SplashScreen();
+            }
             return auth.isAuthenticated ? const MainScreen() : const LoginScreen();
           },
         ),

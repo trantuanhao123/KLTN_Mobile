@@ -44,12 +44,6 @@ class _LoginScreenState extends State<LoginScreen> {
         _emailController.text.trim(),
         _passwordController.text,
       );
-
-      // if (!mounted) return;
-      // Navigator.pushReplacement(
-      //   context,
-      //   MaterialPageRoute(builder: (_) => const MainScreen()),
-      // );
     } catch (e) {
       scaffoldMessenger.showSnackBar(
         SnackBar(
@@ -84,12 +78,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
       await Provider.of<AuthProvider>(context, listen: false).loginWithGoogle(idToken);
 
-      // if (!mounted) return;
-      //
-      // Navigator.pushReplacement(
-      //   context,
-      //   MaterialPageRoute(builder: (_) => const MainScreen()),
-      // );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

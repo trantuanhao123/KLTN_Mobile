@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:mobile/providers/car_provider.dart';
 import 'package:mobile/api/api_service.dart';
 import 'package:mobile/screens/car_detail_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class CarListScreen extends StatefulWidget {
   final String? initialBrandFilter;
@@ -19,12 +20,14 @@ class _CarListScreenState extends State<CarListScreen> {
   String? _selectedBrand;
   int? _selectedCategoryId;
   int? _selectedBranchId;
-  RangeValues _currentPriceRange = const RangeValues(0, 10000000);
+
+  // Giới hạn giá 50 triệu
+  RangeValues _currentPriceRange = const RangeValues(0, 50000000);
 
   String? _modalSelectedBrand;
   int? _modalSelectedCategoryId;
   int? _modalSelectedBranchId;
-  RangeValues _modalPriceRange = const RangeValues(0, 10000000);
+  RangeValues _modalPriceRange = const RangeValues(0, 50000000);
 
   @override
   void initState() {
@@ -150,8 +153,8 @@ class _CarListScreenState extends State<CarListScreen> {
                       RangeSlider(
                         values: _modalPriceRange,
                         min: 0,
-                        max: 10000000,
-                        divisions: 20,
+                        max: 50000000, // Max 50 triệu
+                        divisions: 100, // Tăng độ mịn khi kéo
                         activeColor: const Color(0xFF1CE88A),
                         inactiveColor: Colors.grey[700],
                         labels: RangeLabels(
@@ -172,13 +175,13 @@ class _CarListScreenState extends State<CarListScreen> {
                             _modalSelectedBrand = null;
                             _modalSelectedCategoryId = null;
                             _modalSelectedBranchId = null;
-                            _modalPriceRange = const RangeValues(0, 10000000);
+                            _modalPriceRange = const RangeValues(0, 50000000);
                           });
                           setState(() {
                             _selectedBrand = null;
                             _selectedCategoryId = null;
                             _selectedBranchId = null;
-                            _currentPriceRange = const RangeValues(0, 10000000);
+                            _currentPriceRange = const RangeValues(0, 50000000);
                             _searchController.clear();
                           });
                           carProvider.applyFilters();
@@ -309,12 +312,12 @@ class _CarListScreenState extends State<CarListScreen> {
                   },
                   color: const Color(0xFF1CE88A),
                   child: GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
+                    padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 80.0), // Padding bottom để tránh bị che bởi UI khác nếu có
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       crossAxisSpacing: 16.0,
                       mainAxisSpacing: 16.0,
-                      childAspectRatio: 0.75,
+                      childAspectRatio: 0.72,
                     ),
                     itemCount: carProvider.filteredCars.length,
                     itemBuilder: (context, index) {
@@ -324,17 +327,13 @@ class _CarListScreenState extends State<CarListScreen> {
                       final fullCarImageUrl = imageUrl != null ? "$baseUrl/images/$imageUrl" : null;
                       final pricePerDay = double.tryParse(car['PRICE_PER_DAY']?.toString() ?? '0') ?? 0.0;
 
-                      // Lấy rating và số lượt đánh giá (ưu tiên calculated_rating)
+                      // Lấy rating
                       final double rating = double.tryParse(
                         car['calculated_rating']?.toString() ??
                             car['RATING']?.toString() ??
                             car['rating']?.toString() ??
                             '0',
                       ) ?? 0.0;
-
-                      final int reviewCount = car['review_count'] is int
-                          ? car['review_count']
-                          : int.tryParse(car['review_count']?.toString() ?? '0') ?? 0;
 
                       return GestureDetector(
                         onTap: () {
@@ -343,31 +342,49 @@ class _CarListScreenState extends State<CarListScreen> {
                             MaterialPageRoute(builder: (_) => CarDetailScreen(car: car)),
                           );
                         },
-                        child: Card(
-                          color: Colors.grey[900],
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                          clipBehavior: Clip.antiAlias,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2A2D3E),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Sử dụng CachedNetworkImage
                               Expanded(
-                                child: SizedBox(
-                                  width: double.infinity,
+                                child: ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                                   child: fullCarImageUrl != null
-                                      ? Image.network(
-                                    fullCarImageUrl,
+                                      ? CachedNetworkImage(
+                                    imageUrl: fullCarImageUrl,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Center(
-                                      child: Icon(Icons.broken_image_outlined, color: Colors.grey, size: 40),
+                                    width: double.infinity,
+                                    placeholder: (context, url) => Container(
+                                      color: Colors.grey[800],
+                                      child: const Center(
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1CE88A)),
+                                      ),
                                     ),
-                                    loadingBuilder: (context, child, loadingProgress) {
-                                      if (loadingProgress == null) return child;
-                                      return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.grey));
-                                    },
+                                    errorWidget: (context, url, error) => Container(
+                                      color: Colors.grey[800],
+                                      child: const Icon(Icons.car_repair, color: Colors.grey, size: 50),
+                                    ),
                                   )
-                                      : const Center(child: Icon(Icons.directions_car, color: Colors.grey, size: 50)),
+                                      : Container(
+                                    color: Colors.grey[800],
+                                    child: const Icon(Icons.directions_car, color: Colors.grey, size: 50),
+                                  ),
                                 ),
                               ),
+
+                              // Thông tin chi tiết
                               Padding(
                                 padding: const EdgeInsets.all(10.0),
                                 child: Column(
@@ -380,6 +397,8 @@ class _CarListScreenState extends State<CarListScreen> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 6),
+
+                                    // Layout cho Giá và Rating
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
@@ -392,26 +411,32 @@ class _CarListScreenState extends State<CarListScreen> {
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                        const SizedBox(width: 0.5),
-                                        Text(
-                                          rating.toStringAsFixed(1),
-                                          style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold
-                                          ),
-                                        ),
+
+                                        const SizedBox(width: 4),
+
+                                        // Rating: SỐ - SAO 
                                         Flexible(
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              // Icon sao: vàng nếu có đánh giá, xám nếu chưa có
+                                              // 1. Số điểm
+                                              Text(
+                                                rating.toStringAsFixed(1),
+                                                style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold
+                                                ),
+                                              ),
+                                              const SizedBox(width: 2),
+
+                                              // 2. Icon sao
                                               Icon(
                                                 Icons.star,
                                                 color: rating > 0 ? Colors.amber : Colors.grey[600],
                                                 size: 14,
                                               ),
-                                              const SizedBox(width: 4),
+                                              const SizedBox(width: 2),
                                             ],
                                           ),
                                         ),

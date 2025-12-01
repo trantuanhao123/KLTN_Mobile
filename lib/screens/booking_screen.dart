@@ -192,6 +192,7 @@ class _BookingScreenState extends State<BookingScreen> {
       helpText: 'Chọn ngày thuê',
       confirmText: 'Chọn giờ',
       cancelText: 'Hủy',
+      locale: const Locale('vi', 'VN'),
       builder: (context, child) {
         return Theme(
           data: ThemeData.dark().copyWith(
@@ -212,19 +213,11 @@ class _BookingScreenState extends State<BookingScreen> {
         context: context,
         initialTime: _startTime ?? TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))),
         helpText: 'Chọn giờ nhận xe',
+        confirmText: 'LƯU',
+        cancelText: 'HỦY',
         builder: (context, child) {
-          return Theme(
-            data: ThemeData.dark().copyWith(
-              colorScheme: const ColorScheme.dark(
-                primary: Color(0xFF1CE88A), onPrimary: Colors.black,
-                surface: Colors.black, onSurface: Colors.white,
-              ),
-              dialogBackgroundColor: Colors.grey[900],
-              textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: const Color(0xFF1CE88A))),
-              timePickerTheme: TimePickerThemeData(
-                backgroundColor: Colors.grey[900],
-              ),
-            ),
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
             child: child!,
           );
         },
@@ -235,17 +228,11 @@ class _BookingScreenState extends State<BookingScreen> {
           context: context,
           initialTime: _endTime ?? TimeOfDay.fromDateTime(DateTime(pickedDate.year, pickedDate.month, pickedDate.day, pickedStartTime.hour, pickedStartTime.minute).add(const Duration(hours: 3))),
           helpText: 'Chọn giờ trả xe',
+          confirmText: 'LƯU',
+          cancelText: 'HỦY',
           builder: (context, child) {
-            return Theme(
-              data: ThemeData.dark().copyWith(
-                colorScheme: const ColorScheme.dark(
-                  primary: Color(0xFF1CE88A), onPrimary: Colors.black,
-                  surface: Colors.black, onSurface: Colors.white,
-                ),
-                dialogBackgroundColor: Colors.grey[900],
-                textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: const Color(0xFF1CE88A))),
-                timePickerTheme: TimePickerThemeData(backgroundColor: Colors.grey[900]),
-              ),
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
               child: child!,
             );
           },
@@ -678,7 +665,7 @@ Chi phí Phát sinh & Bồi thường
               ),
               const SizedBox(height: 24),
 
-              const Text('Mã giảm giá (nếu có)', style: TextStyle(color: Colors.white, fontSize: 16)),
+              const Text('Mã giảm giá', style: TextStyle(color: Colors.white, fontSize: 16)),
               const SizedBox(height: 8),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

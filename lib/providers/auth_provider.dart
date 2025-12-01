@@ -5,13 +5,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
-
-  // [MỚI] Khai báo 2 biến còn thiếu
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
-
+  bool _isLoading = true;
+  bool get isLoading => _isLoading;
   bool _isAuthenticated = false;
-
   bool get isAuthenticated => _isAuthenticated;
 
   AuthProvider() {
@@ -20,6 +18,8 @@ class AuthProvider with ChangeNotifier {
 
   // Kiểm tra token khi khởi động app
   Future<void> _checkToken() async {
+    _isLoading = true;
+    notifyListeners();
     String? token = await _apiService.getToken();
     if (token != null) {
       try {
@@ -31,13 +31,12 @@ class AuthProvider with ChangeNotifier {
         }
         _isAuthenticated = false;
         print("Lỗi kiểm tra token: $e");
-      } finally {
-        notifyListeners();
       }
     } else {
       _isAuthenticated = false;
-      notifyListeners();
     }
+    _isLoading = false;
+    notifyListeners();
   }
 
   Future<void> login(String email, String password) async {
@@ -46,16 +45,16 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // [ĐÃ SỬA] Hàm logout an toàn, không bị crash
+  // Hàm logout
   Future<void> logout() async {
     try {
       // Cố gắng báo cho server biết mình đăng xuất
       await _apiService.logout();
     } catch (e) {
       // Nếu server lỗi hoặc mạng lỗi, chỉ in ra và BỎ QUA
-      print("Lỗi API logout (không quan trọng): $e");
+      print("Lỗi API logout: $e");
     } finally {
-      // BẮT BUỘC CHẠY: Xóa dữ liệu trong máy để người dùng thoát ra
+      // Xóa dữ liệu trong máy để người dùng thoát ra
       try {
         await _googleSignIn.signOut();
       } catch (e) {

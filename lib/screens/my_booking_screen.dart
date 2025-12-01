@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile/api/api_service.dart';
-import 'package:mobile/screens/report_incident_screen.dart'; // ĐỔI ĐƯỜNG DẪN NÀY CHO ĐÚNG VỚI PROJECT CỦA BẠN
+import 'package:mobile/screens/report_incident_screen.dart';
 
 class MyBookingScreen extends StatefulWidget {
   const MyBookingScreen({super.key});
@@ -614,7 +614,7 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
     );
   }
 
-  // ===================== CARD ĐƠN HÀNG - ĐÃ THÊM NÚT BÁO SỰ CỐ =====================
+  // ===================== CARD ĐƠN HÀNG  =====================
   Widget _buildBookingCard(Map<String, dynamic> booking) {
     try {
       final car = booking['Car'] ?? {};
@@ -657,8 +657,6 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
       bool canChangeDate = (status == 'CONFIRMED') && isFuture;
       final bool hasReviewed = booking['review'] != null;
       final bool canReview = (status == 'COMPLETED') && !hasReviewed;
-
-      // THÊM DÒNG NÀY - CHỈ HIỆN NÚT KHI ĐANG THUÊ
       final bool canReport = status == 'IN_PROGRESS';
 
       return Card(
@@ -721,7 +719,7 @@ class _MyBookingScreenState extends State<MyBookingScreen> {
                 ],
               ),
 
-              // PHẦN NÚT - ĐÃ THAY ĐỔI THEO YÊU CẦU
+              // PHẦN NÚT
               if (canCancel || canChangeDate || canReview || canReport)
                 Padding(
                   padding: const EdgeInsets.only(top: 16.0),

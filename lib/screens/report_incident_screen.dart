@@ -70,7 +70,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
         widget.orderId,
         widget.carId,
         _contentController.text.trim(),
-        filePaths, // API Service tự động nhận diện đâu là ảnh, đâu là video
+        filePaths,
       );
 
       if (!mounted) return;
@@ -148,9 +148,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                       onPressed: _pickImages,
                       tooltip: 'Chọn ảnh',
                     ),
-                    // [MỚI] Nút chọn Video
+                    // Nút chọn Video
                     IconButton(
-                      icon: const Icon(Icons.videocam, color: Colors.orange), // Màu khác cho nổi bật
+                      icon: const Icon(Icons.videocam, color: Colors.orange),
                       onPressed: _pickVideo,
                       tooltip: 'Chọn video',
                     ),

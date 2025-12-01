@@ -13,11 +13,8 @@ class ProfileScreen extends StatelessWidget {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         final user = userProvider.user;
-
-        // [ĐÃ SỬA] Logic hiển thị Avatar đồng bộ và xử lý đường dẫn đúng
         ImageProvider? avatarProvider;
         final String? avatarUrl = user?['AVATAR_URL'];
-
         if (avatarUrl != null && avatarUrl.isNotEmpty && !avatarUrl.contains('default-avatar')) {
           // Kiểm tra xem link có http chưa, nếu chưa thì nối thêm baseUrl
           String finalUrl = avatarUrl.startsWith('http')
@@ -25,7 +22,6 @@ class ProfileScreen extends StatelessWidget {
               : "${ApiService().baseUrl}/images/$avatarUrl";
           avatarProvider = NetworkImage(finalUrl);
         } else {
-          // [ĐÃ SỬA] Đường dẫn đúng là assets/default-avatar.png (không có thư mục images con)
           avatarProvider = const AssetImage('assets/default-avatar.png');
         }
 
@@ -67,18 +63,17 @@ class ProfileScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
               children: [
-                // --- PHẦN 1: THÔNG TIN USER ---
+                // --- THÔNG TIN USER ---
                 Center(
                   child: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF1CE88A), width: 2), // Thêm viền xanh cho đẹp
+                      border: Border.all(color: const Color(0xFF1CE88A), width: 2), // viền xanh
                     ),
                     child: CircleAvatar(
                       radius: 50,
                       backgroundColor: Colors.grey.shade800,
                       backgroundImage: avatarProvider,
-                      // Không cần child icon nữa vì đã có ảnh mặc định assets
                     ),
                   ),
                 ),
@@ -156,7 +151,7 @@ class ProfileScreen extends StatelessWidget {
                       : 'Chưa cập nhật',
                 ),
 
-                // --- PHẦN 2: LIÊN HỆ HỖ TRỢ (Giữ nguyên code cũ của bạn) ---
+                // --- LIÊN HỆ HỖ TRỢ  ---
                 const Padding(
                   padding: EdgeInsets.only(top: 24.0, bottom: 8.0),
                   child: Divider(color: Colors.white24),

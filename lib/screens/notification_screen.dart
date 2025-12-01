@@ -42,7 +42,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           }
 
           final notifications = snapshot.data!;
-          // Sắp xếp thông báo mới nhất lên đầu (nếu backend chưa sắp xếp)
+          // Sắp xếp thông báo mới nhất lên đầu
           // notifications.sort((a, b) => b['CREATED_AT'].compareTo(a['CREATED_AT']));
 
           return ListView.builder(
